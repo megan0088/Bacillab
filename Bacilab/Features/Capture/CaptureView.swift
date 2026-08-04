@@ -53,6 +53,17 @@ struct CaptureView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+        .alert("Izin Kamera Diperlukan", isPresented: $viewModel.permissionDenied) {
+            Button("Buka Pengaturan") {
+                if let url = URL(string: UIApplication.openSettingsURLString) {
+                    UIApplication.shared.open(url)
+                }
+            }
+            Button("Batal", role: .cancel) {}
+        } message: {
+            Text("Aplikasi tidak dapat mengakses kamera untuk memindai preparat. "
+                 + "Aktifkan izin kamera di Pengaturan, lalu buka kembali layar ini.")
+        }
         .task { await viewModel.startCamera() }
         .onDisappear { viewModel.stopCamera() }
     }
@@ -149,10 +160,11 @@ struct CaptureView: View {
     // MARK: - Confidence Badge
 
     private var confidenceBadge: some View {
-        let pct = draft.aiConfidence > 0
-            ? Int(draft.aiConfidence * 100)
-            : Int.random(in: 85...95)
+        // Never invent a number here: this reads as a diagnostic figure to the
+        // technician. Until the detector reports a confidence there is none to show.
+        let pct = Int((draft.aiConfidence * 100).rounded())
         return Text("\(pct)% AI Confidence Level")
+            .opacity(draft.aiConfidence > 0 ? 1 : 0)
             .font(.caption2.weight(.semibold))
             .padding(.horizontal, 10)
             .padding(.vertical, 5)
@@ -206,10 +218,24 @@ struct CaptureView: View {
                     .padding(.bottom, 8)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(draft.grade.rawValue)
-                        .font(.system(.headline, design: .rounded, weight: .bold))
-                        .foregroundStyle(gradeColor(draft.grade))
-                    Text("BTA Terdeteksi")
+                    HStack(spacing: 5) {
+                        if !draft.isGradeConfirmed {
+                            Text("SEMENTARA")
+                                .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.25), in: Capsule())
+                                .foregroundStyle(.orange)
+                        }
+                        Text(draft.grade.rawValue)
+                            .font(.system(.headline, design: .rounded, weight: .bold))
+                            .foregroundStyle(gradeColor(draft.grade))
+                    }
+                    // Below the WHO/IUATLD minimum this grade is not reportable yet,
+                    // so say what is still missing instead of implying a conclusion.
+                    Text(draft.isGradeConfirmed
+                         ? "BTA Terdeteksi"
+                         : "Perlu \(draft.fieldsRemainingForGrade) lapang lagi")
                         .font(.caption)
                         .foregroundStyle(.white.opacity(0.5))
                 }
@@ -222,7 +248,7 @@ struct CaptureView: View {
                 HStack(spacing: 8) {
                     ForEach(BTAGrade.allCases, id: \.self) { grade in
                         CaptureGradePill(grade: grade, isSelected: draft.grade == grade) {
-                            draft.grade = grade
+                            draft.selectGrade(grade)
                         }
                     }
                 }

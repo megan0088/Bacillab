@@ -64,10 +64,19 @@ struct AnalysisView: View {
             .fill(Color(.systemGray5))
             .frame(width: 240, height: 240)
             .overlay {
-                Image(systemName: "photo.circle")
-                    .font(.system(size: 52))
-                    .foregroundStyle(.tertiary)
+                // Show the field that was actually analysed — reviewing a count
+                // without seeing its image is not a review.
+                if let data = draft.imageData, let image = UIImage(data: data) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Image(systemName: "photo.circle")
+                        .font(.system(size: 52))
+                        .foregroundStyle(.tertiary)
+                }
             }
+            .clipShape(Circle())
             .overlay(Circle().stroke(Color(.systemGray4), lineWidth: 1))
             .shadow(color: .black.opacity(0.06), radius: 10, y: 4)
     }
@@ -138,7 +147,7 @@ struct AnalysisView: View {
                 HStack(spacing: 8) {
                     ForEach(BTAGrade.allCases, id: \.self) { grade in
                         GradePill(grade: grade, isSelected: draft.grade == grade) {
-                            draft.grade = grade
+                            draft.selectGrade(grade)
                         }
                     }
                 }

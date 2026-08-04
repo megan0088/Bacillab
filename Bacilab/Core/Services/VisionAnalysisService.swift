@@ -45,7 +45,8 @@ final class VisionAnalysisService: AnalysisServiceProtocol {
     private let iouThreshold: Float = 0.7
 
     func analyze(imageData: Data) async throws -> AnalysisResult {
-        guard let uiImage = UIImage(data: imageData), let cgImage = uiImage.cgImage else {
+        guard let uiImage = UIImage(data: imageData),
+              let cgImage = Self.uprightCenteredSquare(of: uiImage) else {
             throw AnalysisError.invalidImage
         }
 
@@ -94,6 +95,40 @@ final class VisionAnalysisService: AnalysisServiceProtocol {
                 continuation.resume(throwing: AnalysisError.inferenceFailure(error.localizedDescription))
             }
         }
+    }
+
+    // MARK: - Input framing
+
+    /// Redraws the photo upright and crops it to the largest centred square.
+    ///
+    /// Two things go wrong on a real device without this. A photo straight out of
+    /// `AVCapturePhotoOutput` carries its rotation in EXIF, which `VNImageRequestHandler`
+    /// ignores when handed a bare `CGImage` — the field would be analysed sideways. And
+    /// the frame is 4:3, so letterboxing it into the model's 1024x1024 input shrinks
+    /// every bacillus well below the ~13px it was trained at. Cropping to the square
+    /// that holds the circular microscope field restores the training-time scale.
+    /// On the simulator's already-square field this is a no-op beyond the redraw.
+    private static func uprightCenteredSquare(of image: UIImage) -> CGImage? {
+        let side = min(image.size.width, image.size.height)
+        guard side > 0 else { return nil }
+
+        let origin = CGPoint(
+            x: (image.size.width - side) / 2,
+            y: (image.size.height - side) / 2
+        )
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = image.scale
+        format.opaque = true
+        let renderer = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        )
+        // `draw` applies imageOrientation, so what lands in the context is upright
+        let square = renderer.image { _ in
+            image.draw(at: CGPoint(x: -origin.x, y: -origin.y))
+        }
+        return square.cgImage
     }
 
     // MARK: - OBB decoding

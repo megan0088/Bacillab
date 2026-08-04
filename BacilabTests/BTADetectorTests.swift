@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import CoreML
+import UIKit
 @testable import Bacilab
 
 /// Guards the hand-written YOLO-OBB decoding in `VisionAnalysisService`.
@@ -46,6 +47,32 @@ struct BTADetectorTests {
         #expect(result.confidence > 0.25)
         // 105 in a single field extrapolates to 10 500 per 100 fields
         #expect(result.grade == .plus3)
+    }
+
+    /// A photo from `AVCapturePhotoOutput` stores its rotation in EXIF rather than in the
+    /// pixels. `VNImageRequestHandler(cgImage:)` ignores that, so without the upright
+    /// redraw the field would be analysed sideways on every portrait capture — something
+    /// the square simulator image can never surface.
+    @Test("Foto dengan EXIF rotation memberi hitungan yang sama")
+    func rotatedInputMatchesUpright() async throws {
+        let service = VisionAnalysisService()
+        let base = try #require(UIImage(data: try probeImageData()))
+        let cg = try #require(base.cgImage)
+
+        // Both sides go through an identical JPEG round-trip, so the only difference
+        // left is the EXIF orientation flag — otherwise compression artefacts around
+        // the 0.25 confidence cutoff would show up as a false orientation failure.
+        func jpeg(_ orientation: UIImage.Orientation) throws -> Data {
+            let image = UIImage(cgImage: cg, scale: base.scale, orientation: orientation)
+            return try #require(image.jpegData(compressionQuality: 0.95))
+        }
+
+        let upright = try await service.analyze(imageData: try jpeg(.up))
+        let afterRotation = try await service.analyze(imageData: try jpeg(.right))
+
+        let drift = abs(afterRotation.btaCount - upright.btaCount)
+        #expect(drift <= 8,
+                "Hitungan bergeser \(drift) saat gambar diputar (\(upright.btaCount) → \(afterRotation.btaCount)) — orientasi tidak ditangani")
     }
 }
 

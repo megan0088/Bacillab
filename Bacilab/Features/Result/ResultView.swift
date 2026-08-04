@@ -135,9 +135,26 @@ struct ResultView: View {
             .padding(16)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(gradeColor, in: RoundedRectangle(cornerRadius: 14))
+
+            if !isGradeReportable {
+                Label(
+                    "Baru \(viewModel.sample.capturedFieldCount) lapang pandang dibaca. "
+                    + "Grade \(grade.rawValue) memerlukan \(grade.minimumFields) lapang "
+                    + "(WHO/IUATLD), jadi hasil ini belum final.",
+                    systemImage: "exclamationmark.circle.fill"
+                )
+                .font(.caption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .padding(16)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    /// Enough fields read for this grade to stand as a report, per WHO/IUATLD.
+    private var isGradeReportable: Bool {
+        viewModel.sample.capturedFieldCount >= grade.minimumFields
     }
 
     // MARK: - Stats
