@@ -23,6 +23,26 @@
 - Grading dan ambang lapang **tidak berubah**: `BTAGrade.grade(for:across:)` dan `BTAGrade.minimumFields` (3+ = 20, 2+ = 50, 1+/Scanty/Negatif = 100).
 - Target batch scan: **20 lapang** (`ExamSession.batchTarget`). Angka ini **tidak pernah** ikut perhitungan grading.
 
+## Urutan Eksekusi
+
+Nomor task **bukan** urutan kerja. Layar saling merujuk ke depan — `PatientDataView` membuka
+`ScanView`, `ScanView` membuka `ReviewView`, `ReviewView` membuka `ResultSheetView` — jadi
+dibangun dari hilir ke hulu supaya setiap task ter-compile tanpa stub sementara.
+
+**Kerjakan dengan urutan ini:**
+
+```
+1 → 2 → 3 → 4 → 5 → 6 → 7 → 8      (model, penyimpanan, antrean, DI)
+15                                  (ResultSheetView — tidak merujuk apa pun)
+12 → 13 → 14                        (Review: view model, komponen, view)
+10 → 11                             (Scan: view model, view)
+9                                   (PatientDataView)
+16 → 17 → 18                        (beranda, hapus alur lama, dokumen)
+```
+
+Setiap task tetap dirujuk dengan nomornya sendiri. Tidak ada task yang perlu menyulih tujuan
+`NavigationLink` dengan `Text(...)` sementara.
+
 **Perintah test (dipakai di setiap task):**
 
 ```bash
@@ -1998,7 +2018,7 @@ git commit -m "feat: wire session store and per-session analysis queue into DI c
 
 Delapan field sesuai hi-fi, dua bagian. Nama dokter dan nomor akses **tidak ada** di sini: keduanya dikumpulkan form lama tapi tidak pernah ditampilkan di layar mana pun.
 
-> **Catatan urutan:** task ini merujuk `ScanView` yang baru dibuat di Task 11. Kerjakan Task 9 sampai Step 3, lalu kembalikan `NavigationLink` ke `ScanView` setelah Task 11 selesai. Kalau dikerjakan berurutan penuh, ganti sementara tujuan `NavigationLink` dengan `Text("Sesi Scan")` supaya task ini ter-compile sendiri.
+Dikerjakan setelah Task 11 (lihat Urutan Eksekusi), jadi `ScanView` sudah ada saat task ini dimulai.
 
 - [ ] **Step 1: Buat view-nya**
 
@@ -2550,7 +2570,6 @@ git commit -m "fix: count every scanned field, including empty ones"
 **Files:**
 - Create: `Bacilab/Features/Scan/ScanView.swift`
 - Move: `Bacilab/Features/Capture/Components/CameraPreviewView.swift` → `Bacilab/Features/Scan/Components/CameraPreviewView.swift`
-- Modify: `Bacilab/Features/PatientData/PatientDataView.swift` (kembalikan `NavigationLink` ke `ScanView` kalau tadi disementarakan)
 - Test: build + `#Preview`
 
 **Interfaces:**
@@ -2561,7 +2580,7 @@ Layar paling sedikit isinya di seluruh app, dan itu disengaja. Yang tampil hanya
 
 Viewfinder **kotak** dengan lingkaran tipis sebagai panduan. Kotak itu persis crop yang diterima model, jadi semua yang ditampilkan dianalisis dan semua yang dianalisis ditampilkan. Masker lingkaran akan menutupi π/4 ≈ 78,5% luasnya, menyisakan 21,5% area yang tetap dihitung tapi tidak pernah terlihat.
 
-> **Catatan urutan:** `ReviewView` baru ada di Task 14. Sampai itu selesai, ganti tujuan `NavigationLink` "Selesai" dengan `Text("Review")`.
+Dikerjakan setelah Task 14 (lihat Urutan Eksekusi), jadi `ReviewView` sudah ada saat task ini dimulai.
 
 - [ ] **Step 1: Pindahkan CameraPreviewView**
 
@@ -3664,14 +3683,13 @@ git commit -m "feat: add review components — pager, canvas, keypad"
 
 **Files:**
 - Create: `Bacilab/Features/Review/ReviewView.swift`
-- Modify: `Bacilab/Features/Scan/ScanView.swift` (kembalikan `NavigationLink` ke `ReviewView` kalau tadi disementarakan)
 - Test: build + `#Preview`
 
 **Interfaces:**
 - Consumes: `ReviewViewModel` (Task 12), komponen (Task 13), `FieldAnalysisQueue`, `AppDependencies`
 - Produces: `ReviewView(session: ExamSession, queue: FieldAnalysisQueue, dependencies: AppDependencies)` — meneruskan ke `ResultSheetView` (Task 15)
 
-> **Catatan urutan:** `ResultSheetView` baru ada di Task 15. Sampai itu selesai, ganti tujuan `navigationDestination` dengan `Text("Lembar Hasil")`.
+Dikerjakan setelah Task 15 (lihat Urutan Eksekusi), jadi `ResultSheetView` sudah ada saat task ini dimulai.
 
 **Lanjut Scan:** menyetel `session.status = .scanning` lalu `dismiss()`. Review selalu di-push dari `ScanView`, jadi menutupnya mengembalikan analis ke sesi yang sama, dengan lapang yang sudah ada tetap utuh.
 
@@ -4079,7 +4097,6 @@ git commit -m "feat: add per-field review screen owning counts and grade"
 
 **Files:**
 - Create: `Bacilab/Features/ResultSheet/ResultSheetView.swift`
-- Modify: `Bacilab/Features/Review/ReviewView.swift` (kembalikan `navigationDestination` kalau tadi disementarakan)
 - Test: build + `#Preview`
 
 **Interfaces:**

@@ -6,6 +6,7 @@ struct AnalysisView: View {
     @State private var viewModel: AnalysisViewModel
     @State private var navigateToResult = false
     @State private var builtSample: Sample?
+    @State private var showGradingInfo = false
 
     init(draft: SampleDraft, viewModel: AnalysisViewModel) {
         self.draft = draft
@@ -13,7 +14,7 @@ struct AnalysisView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(spacing: 28) {
                     circularImagePreview
@@ -25,23 +26,22 @@ struct AnalysisView: View {
                 .padding(24)
             }
 
-            // Floating N → next
+            // Says where it goes, rather than leaving the analyst to decode a letter
             Button {
                 let sample = Sample.build(from: draft)
                 builtSample = sample
                 navigateToResult = true
             } label: {
-                Circle()
-                    .fill(Color.pink)
-                    .frame(width: 56, height: 56)
-                    .overlay {
-                        Text("N")
-                            .font(.title2.bold())
-                            .foregroundStyle(.white)
-                    }
-                    .shadow(color: .pink.opacity(0.4), radius: 8, y: 4)
+                Label("Lihat Interpretasi", systemImage: "arrow.right.circle.fill")
+                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 15)
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 14))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.15), radius: 10, y: 4)
             }
-            .padding(24)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 20)
         }
         .navigationTitle("Review")
         .navigationBarTitleDisplayMode(.inline)
@@ -94,8 +94,11 @@ struct AnalysisView: View {
                         .foregroundStyle(Color(.systemGray3))
                 }
 
+                // A full 100-field read reaches four digits, which wraps at this size
                 Text(String(format: "%02d", draft.manualBTACount))
                     .font(.system(size: 52, weight: .bold, design: .monospaced))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
                     .frame(minWidth: 80)
                     .contentTransition(.numericText())
 
@@ -128,11 +131,69 @@ struct AnalysisView: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer()
-            Button { } label: {
-                Image(systemName: "ellipsis.circle")
+            Button {
+                showGradingInfo = true
+            } label: {
+                Image(systemName: "info.circle")
                     .foregroundStyle(.secondary)
             }
+            .sheet(isPresented: $showGradingInfo) { gradingInfoSheet }
         }
+    }
+
+    private var gradingInfoSheet: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text("Sistem grading WHO/IUATLD didasarkan pada jumlah BTA yang ditemukan per 100 lapang pandang.")
+                        .font(.callout)
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    VStack(spacing: 0) {
+                        gradingRow(grade: "Negatif", criteria: "0 BTA dalam 100 lapang", color: .green)
+                        Divider().padding(.leading, 16)
+                        gradingRow(grade: "Scanty",  criteria: "1–9 BTA dalam 100 lapang", color: .orange)
+                        Divider().padding(.leading, 16)
+                        gradingRow(grade: "1+",      criteria: "10–99 BTA dalam 100 lapang", color: .red)
+                        Divider().padding(.leading, 16)
+                        gradingRow(grade: "2+",      criteria: "1–10 BTA per lapang (≥50 lapang)", color: .red)
+                        Divider().padding(.leading, 16)
+                        gradingRow(grade: "3+",      criteria: ">10 BTA per lapang (≥20 lapang)", color: .red)
+                    }
+                    .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+
+                    Text("Grading bersifat SEMENTARA sampai jumlah lapang minimum terpenuhi.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(20)
+            }
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("Panduan Grading BTA")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Tutup") { showGradingInfo = false }
+                }
+            }
+        }
+    }
+
+    private func gradingRow(grade: String, criteria: String, color: Color) -> some View {
+        HStack {
+            Text(grade)
+                .font(.system(.body, design: .rounded, weight: .bold))
+                .foregroundStyle(color)
+                .frame(width: 64, alignment: .leading)
+            Text(criteria)
+                .font(.callout)
+                .foregroundStyle(.primary)
+            Spacer()
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Grade Pills

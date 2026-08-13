@@ -6,6 +6,10 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		0BA100000000000000000001 /* onnxruntime in Frameworks */ = {isa = PBXBuildFile; productRef = 0BA100000000000000000003 /* onnxruntime */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
 		C46B7DF23020234C00BFF1A8 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
@@ -52,6 +56,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0BA100000000000000000001 /* onnxruntime in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -112,6 +117,7 @@
 			);
 			name = Bacilab;
 			packageProductDependencies = (
+				0BA100000000000000000003 /* onnxruntime */,
 			);
 			productName = Bacilab;
 			productReference = C46B7DE23020234C00BFF1A8 /* Bacilab.app */;
@@ -195,6 +201,9 @@
 			);
 			mainGroup = C46B7DD93020234B00BFF1A8;
 			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				0BA100000000000000000002 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */,
+			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = C46B7DE33020234C00BFF1A8 /* Products */;
 			projectDirPath = "";
@@ -580,6 +589,25 @@
 			defaultConfigurationName = Release;
 		};
 /* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		0BA100000000000000000002 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/microsoft/onnxruntime-swift-package-manager";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 1.24.2;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0BA100000000000000000003 /* onnxruntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0BA100000000000000000002 /* XCRemoteSwiftPackageReference "onnxruntime-swift-package-manager" */;
+			productName = onnxruntime;
+		};
+/* End XCSwiftPackageProductDependency section */
 	};
 	rootObject = C46B7DDA3020234B00BFF1A8 /* Project object */;
 }

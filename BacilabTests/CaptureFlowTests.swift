@@ -5,7 +5,7 @@ import AVFoundation
 @testable import Bacilab
 
 /// Covers the wiring the detector depends on: a capture has to produce real image
-/// bytes, those bytes have to reach `VisionAnalysisService`, and the count it returns
+/// bytes, those bytes have to reach `ResNetAnalysisService`, and the count it returns
 /// has to land on the shared draft. Before photo capture was implemented this whole
 /// path silently no-opped — `captureImage()` returned empty data, so `analyze` was
 /// never called and every slide came back as 0 BTA.
@@ -95,7 +95,10 @@ struct CaptureFlowTests {
 
         #expect(draft.grade == .scanty,
                 "Pilihan analis berubah jadi \(draft.grade.rawValue) setelah capture")
-        #expect(auto != .scanty, "Prasyarat test: grade otomatis harus berbeda")
+        // `.negative` is what a detector that never ran would produce, and it also satisfies
+        // "berbeda dari .scanty" — so require a grade that only real detections can give.
+        #expect(auto != .scanty && auto != .negative,
+                "Prasyarat test: grade otomatis harus berasal dari deteksi nyata, dapat \(auto.rawValue)")
         // The count itself must keep accumulating — only the grade is pinned
         #expect(draft.capturedFieldCount == 2)
     }
@@ -128,6 +131,9 @@ struct CaptureFlowTests {
         let afterFirst = draft.manualBTACount
         await viewModel.capture(into: draft)
 
+        // 0 == 0 * 2 holds, so without this the accumulation check passes even when the
+        // detector produced nothing at all.
+        #expect(afterFirst > 0, "Capture pertama tidak menghasilkan deteksi apa pun")
         #expect(draft.capturedFieldCount == 2)
         #expect(draft.manualBTACount == afterFirst * 2,
                 "Lapang pandang sintetis identik, jadi hitungannya harus persis berlipat")

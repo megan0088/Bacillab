@@ -9,7 +9,9 @@ final class AppDependencies {
 
     init() {
         cameraService = CameraService()
-        analysisService = VisionAnalysisService()
+        // Both detectors read every field. ResNet drives the count and the grade; YOLO's
+        // figure is carried alongside for comparison only. See `DualDetectorService`.
+        analysisService = MultiDetectorService()
         sampleRepository = SampleRepository()
     }
 }

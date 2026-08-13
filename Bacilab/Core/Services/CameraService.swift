@@ -1,4 +1,4 @@
-import AVFoundation
+@preconcurrency import AVFoundation
 import UIKit
 
 final class CameraService: NSObject, CameraServiceProtocol {
@@ -38,13 +38,24 @@ final class CameraService: NSObject, CameraServiceProtocol {
                     continuation.resume(throwing: CameraError.deviceUnavailable)
                     return
                 }
-                if captureSession.canAddInput(input) { captureSession.addInput(input) }
-                guard captureSession.canAddOutput(photoOutput) else {
-                    captureSession.commitConfiguration()
-                    continuation.resume(throwing: CameraError.deviceUnavailable)
-                    return
+                // Only add input if this exact device isn't already wired up
+                // (startSession may be called again after stopSession without full teardown)
+                let alreadyHasInput = captureSession.inputs
+                    .compactMap { $0 as? AVCaptureDeviceInput }
+                    .contains { $0.device == device }
+                if !alreadyHasInput, captureSession.canAddInput(input) {
+                    captureSession.addInput(input)
                 }
-                captureSession.addOutput(photoOutput)
+
+                // photoOutput stays attached across stop/start cycles; only add it once
+                if !captureSession.outputs.contains(photoOutput) {
+                    guard captureSession.canAddOutput(photoOutput) else {
+                        captureSession.commitConfiguration()
+                        continuation.resume(throwing: CameraError.deviceUnavailable)
+                        return
+                    }
+                    captureSession.addOutput(photoOutput)
+                }
                 captureSession.commitConfiguration()
                 captureSession.startRunning()
                 continuation.resume()

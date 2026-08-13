@@ -3,7 +3,6 @@ import SwiftUI
 // Interpretation screen — final result summary
 struct ResultView: View {
     @State private var viewModel: ResultViewModel
-    @State private var labNotes = ""
 
     init(viewModel: ResultViewModel) {
         _viewModel = State(initialValue: viewModel)
@@ -207,27 +206,30 @@ struct ResultView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Notes by Medical Laboratory")
+            Text("Catatan Laboratorium")
                 .font(.system(.caption, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
 
-            TextEditor(text: $labNotes)
-                .frame(minHeight: 90)
-                .padding(10)
-                .background(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(.systemGray4), lineWidth: 1)
-                )
-                .overlay(alignment: .topLeading) {
-                    if labNotes.isEmpty {
-                        Text("Tambahkan catatan laboratorium...")
-                            .font(.system(.body))
-                            .foregroundStyle(.tertiary)
-                            .padding(.top, 18)
-                            .padding(.leading, 14)
-                            .allowsHitTesting(false)
-                    }
+            TextEditor(text: Binding(
+                get: { viewModel.notes },
+                set: { viewModel.notes = $0 }
+            ))
+            .frame(minHeight: 90)
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .stroke(Color(.systemGray4), lineWidth: 1)
+            )
+            .overlay(alignment: .topLeading) {
+                if viewModel.notes.isEmpty {
+                    Text("Tambahkan catatan laboratorium...")
+                        .font(.system(.body))
+                        .foregroundStyle(.tertiary)
+                        .padding(.top, 18)
+                        .padding(.leading, 14)
+                        .allowsHitTesting(false)
                 }
+            }
         }
         .padding(16)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))

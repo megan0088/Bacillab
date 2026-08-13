@@ -1,0 +1,135 @@
+import Foundation
+import OSLog
+
+private let multiLog = Diag("multi")
+
+/// Runs the detector(s) the analyst picked over one field.
+///
+/// With `.all`, the point of reading one field three times is that the alternative —
+/// capturing once per model — cannot work: the microscope drifts and the focus changes
+/// between shots, so a difference in counts would be part model and part field, inseparably.
+/// Here every model receives the identical `Data`, framed identically by `FieldFraming`, so a
+/// disagreement is only ever about the models. Picking a single model is for looking at one
+/// in isolation; it is not a way to compare them.
+///
+/// **The grade follows `selection.gradingDetector`, and nothing else.** With `.all` that is
+/// ResNet and the two YOLOs merely ride along; averaging them would produce a count no model
+/// actually made. Choosing one on purpose does hand the grade to it — that is what choosing
+/// means — so the UI has to name whichever model produced the number on screen.
+final class MultiDetectorService: AnalysisServiceProtocol {
+
+    /// One entry per detector. A dictionary rather than three stored properties so adding a
+    /// fourth model touches this line and nothing else in the orchestration below.
+    private let detectors: [DetectorKind: any AnalysisServiceProtocol]
+
+    init(detectors: [DetectorKind: any AnalysisServiceProtocol] = [
+        .resnet: ResNetAnalysisService(),
+        .yolo: YOLOAnalysisService(),
+        .yolo11: YOLO11AnalysisService(),
+    ]) {
+        self.detectors = detectors
+    }
+
+    func analyze(imageData: Data) async throws -> AnalysisResult {
+        try await analyze(imageData: imageData, using: .all)
+    }
+
+    func analyze(imageData: Data, using selection: DetectorSelection) async throws -> AnalysisResult {
+        // All requested models run concurrently: the two YOLOs are milliseconds against the
+        // ResNet's seconds, so the comparison costs the technician essentially nothing beyond
+        // the slowest single model.
+        let requested = DetectorKind.allCases.filter {
+            selection.includes($0) && detectors[$0] != nil
+        }
+
+        let outcomes = await withTaskGroup(of: Outcome.self) { group -> [Outcome] in
+            for kind in requested {
+                guard let service = detectors[kind] else { continue }
+                group.addTask { await self.timed(kind) { try await service.analyze(imageData: imageData) } }
+            }
+            var collected: [Outcome] = []
+            for await outcome in group { collected.append(outcome) }
+            // Task groups complete out of order; restore a stable order so the columns do
+            // not swap places between fields.
+            return collected.sorted {
+                let all = DetectorKind.allCases
+                return all.firstIndex(of: $0.reading.detector)! < all.firstIndex(of: $1.reading.detector)!
+            }
+        }
+
+        // The grading model's failure is a real failure — there is no result without it.
+        // The other model's failure is not: it becomes a reading marked `failure`, so the UI
+        // can say the comparison did not run rather than show a zero reading as "saw nothing".
+        guard let grading = outcomes.first(where: { $0.reading.detector == selection.gradingDetector }) else {
+            throw AnalysisError.modelUnavailable
+        }
+        guard let result = try grading.result() else {
+            throw AnalysisError.modelUnavailable
+        }
+
+        // The exact figures the UI receives. Logged here because the models can be provably
+        // right while the number on screen is wrong, and this is the boundary between them.
+        let summary = outcomes.map { "\($0.reading.detector.rawValue)=\($0.reading.btaCount)" }
+        multiLog.note("pilihan=\(selection.rawValue) grade-dari=\(selection.gradingDetector.rawValue) "
+                      + "bacaan[\(summary.joined(separator: " "))] btaCount=\(result.btaCount)")
+
+        return AnalysisResult(
+            btaCount: result.btaCount,
+            confidence: result.confidence,
+            grade: result.grade,
+            analyzedAt: result.analyzedAt,
+            detectedBoxes: result.detectedBoxes,
+            readings: outcomes.map(\.reading)
+        )
+    }
+
+    // MARK: - Timing
+
+    private struct Outcome {
+        let reading: DetectorReading
+        let value: AnalysisResult?
+        let error: Error?
+
+        /// Rethrows the grading detector's failure; `nil` only when there is nothing to report.
+        func result() throws -> AnalysisResult? {
+            if let error { throw error }
+            return value
+        }
+    }
+
+    private func timed(_ detector: DetectorKind,
+                       _ work: @escaping () async throws -> AnalysisResult) async -> Outcome {
+        let started = Date()
+        do {
+            let value = try await work()
+            return Outcome(
+                reading: DetectorReading(
+                    detector: detector,
+                    btaCount: value.btaCount,
+                    confidence: value.confidence,
+                    elapsed: Date().timeIntervalSince(started),
+                    boxes: value.detectedBoxes
+                ),
+                value: value,
+                error: nil
+            )
+        } catch {
+            multiLog.error("""
+                \(detector.rawValue) gagal setelah \
+                \(Date().timeIntervalSince(started))s: \
+                \(error.localizedDescription)
+                """)
+            return Outcome(
+                reading: DetectorReading(
+                    detector: detector,
+                    btaCount: 0,
+                    confidence: 0,
+                    elapsed: Date().timeIntervalSince(started),
+                    failure: error.localizedDescription
+                ),
+                value: nil,
+                error: error
+            )
+        }
+    }
+}

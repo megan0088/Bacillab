@@ -74,8 +74,27 @@ final class BacilabUITests: XCTestCase {
                       "Sisa lapang pandang tidak diberitahukan ke analis")
         snap(app, "05-capture-after-shot")
 
-        app.buttons["Continue"].tap()
+        // Moving to the next field must be a labelled action, not a bare circle
+        let nextField = app.buttons["Ambil Lapang Berikutnya"]
+        XCTAssertTrue(nextField.waitForExistence(timeout: 5),
+                      "Tidak ada tombol jelas untuk pindah ke lapang pandang berikutnya")
+        nextField.tap()
+
+        XCTAssertTrue(app.staticTexts["2 of 100 Field"].waitForExistence(timeout: 15),
+                      "Lapang pandang kedua tidak terekam")
+        snap(app, "06-second-field")
+
+        app.buttons["Selesai, Lanjut ke Review"].tap()
         XCTAssertTrue(app.navigationBars["Review"].waitForExistence(timeout: 5))
-        snap(app, "06-review")
+        snap(app, "07-review")
+
+        // The old FAB read only "N"; the action now states its destination
+        let toResult = app.buttons["Lihat Interpretasi"]
+        XCTAssertTrue(toResult.waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["N"].exists, "Tombol 'N' masih ada")
+        toResult.tap()
+
+        XCTAssertTrue(app.navigationBars["Interpretation"].waitForExistence(timeout: 5))
+        snap(app, "08-interpretation")
     }
 }

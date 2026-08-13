@@ -1,220 +1,210 @@
-import Vision
-import CoreML
+import CoreGraphics
+import Foundation
+
+private let resnetLog = Diag("resnet")
+// @preconcurrency: ORTSession is not annotated Sendable, but ONNX Runtime documents a
+// session as safe to Run concurrently, and here it is created once and only ever read.
+@preconcurrency import OnnxRuntimeBindings
 import UIKit
 
 // Errors that can be thrown during BTA analysis
 enum AnalysisError: LocalizedError {
     case invalidImage
+    case modelUnavailable
     case inferenceFailure(String)
 
     var errorDescription: String? {
         switch self {
         case .invalidImage:
             return "Gambar tidak valid atau tidak dapat diproses."
+        case .modelUnavailable:
+            return "Model deteksi BTA tidak dapat dimuat. Hitungan tidak bisa dilakukan."
         case .inferenceFailure(let msg):
             return "Gagal menjalankan deteksi: \(msg)"
         }
     }
 }
 
-// One oriented detection, in the model's 1024x1024 input space.
-// Angle is in radians; only the geometry NMS needs it, the flow only counts.
-private struct OrientedBox {
-    let cx, cy, w, h, angle: Float
-}
+final class ResNetAnalysisService: AnalysisServiceProtocol {
 
-final class VisionAnalysisService: AnalysisServiceProtocol {
-
-    // BTADetector is a YOLOv8s-OBB export (task=obb, single class "AFB", 1024x1024).
-    // Its head is *not* an NMS pipeline, so Vision cannot emit VNRecognizedObjectObservation
-    // for it — the raw (1, 6, 21504) tensor is decoded by hand in `decode` below.
-    // Xcode compiles the bundled .mlpackage to .mlmodelc, which is what ships in the app.
-    private static let vnModel: VNCoreMLModel? = {
-        guard
-            let url = Bundle.main.url(forResource: "BTADetector", withExtension: "mlmodelc"),
-            let mlModel = try? MLModel(contentsOf: url, configuration: MLModelConfiguration()),
-            let vnModel = try? VNCoreMLModel(for: mlModel)
-        else { return nil }
-        return vnModel
+    // BTADetector.onnx is fold 4 of the 5-fold run in `runs/`: a torchvision
+    // Faster R-CNN ResNet50-FPN (2 classes, background + AFB) exported with the whole
+    // detection pipeline inside the graph — GeneralizedRCNNTransform, RPN, ROIAlign and
+    // class NMS all run in ONNX Runtime. Swift hands over raw pixels and reads boxes back.
+    //
+    // Not CoreML, and not for lack of trying: Faster R-CNN has data-dependent control flow
+    // (score filtering, top-k proposals, a variable NMS output length). `torch.jit.trace`
+    // bakes one sample's counts in as constants and then silently returns that same count
+    // for every slide; `torch.jit.script` keeps the control flow but coremltools cannot
+    // convert the result. ONNX is the export that preserves the real pipeline.
+    private static let session: ORTSession? = {
+        guard let path = Bundle.main.path(forResource: "BTADetector", ofType: "onnx") else {
+            return nil
+        }
+        return try? ORTSession(env: env, modelPath: path, sessionOptions: nil)
     }()
 
-    // Matches the model's training-time defaults. Both are clinical calibration knobs:
-    // confidence trades false negatives against false positives, iou decides how close
-    // two bacilli may sit before being counted as one.
-    private let confidenceThreshold: Float = 0.25
-    private let iouThreshold: Float = 0.7
+    private static let env: ORTEnv = {
+        // force-try: ORTEnv only fails if the runtime itself cannot start, in which case
+        // nothing below could work either.
+        try! ORTEnv(loggingLevel: ORTLoggingLevel.warning)
+    }()
 
+    /// Whether the bundled Faster R-CNN actually loaded.
+    ///
+    /// Exists for the tests: without it a suite could pass while the detector was never
+    /// there. Nothing in the app should branch on this — `analyze` throws
+    /// `.modelUnavailable` rather than degrade, and that is the only correct response.
+    static var isDetectorLoaded: Bool { session != nil }
+
+    // A full field takes seconds on device, so keep it off the cooperative pool.
+    private static let inferenceQueue = DispatchQueue(label: "id.klinikbunda.bacilab.inference",
+                                                      qos: .userInitiated)
+
+    /// The score cutoff and NMS IoU are **compiled into the graph**, not applied here:
+    /// `box_score_thresh=0.70`, `box_nms_thresh=0.50`, taken from fold 4's
+    /// `calibrated_metrics.json` (the threshold search picked 0.70, giving precision 0.79 /
+    /// recall 0.76 / count MAE 1.32 on its validation split). Changing either one means
+    /// re-exporting the model — there is no Swift-side knob, deliberately, so the shipped
+    /// thresholds always match the ones that were actually measured.
+    ///
+    /// Those figures come from fold 4's own validation split and are the best of the five
+    /// folds; the 5-fold mean is AP50 0.72 / count MAE 1.81. Neither has been checked
+    /// against slides read at Klinik Bunda.
     func analyze(imageData: Data) async throws -> AnalysisResult {
         guard let uiImage = UIImage(data: imageData),
-              let cgImage = Self.uprightCenteredSquare(of: uiImage) else {
+              let cgImage = FieldFraming.uprightCenteredSquare(of: uiImage) else {
             throw AnalysisError.invalidImage
         }
 
-        // If no model is bundled, return a stub so the rest of the flow works
-        guard let model = Self.vnModel else {
-            return AnalysisResult(btaCount: 0, confidence: 0, grade: .negative, analyzedAt: Date())
+        // A missing model must be loud. This used to return a stub
+        // (`btaCount: 0, grade: .negative`) so the flow would keep working, but that is the
+        // single most dangerous thing this file can do: a slide the model never looked at
+        // comes back reading *Negatif*, which is the result that sends an infectious patient
+        // home untreated. It also let tests go green without the detector ever loading.
+        guard let session = Self.session else {
+            throw AnalysisError.modelUnavailable
         }
 
         return try await withCheckedThrowingContinuation { continuation in
-            let request = VNCoreMLRequest(model: model) { [weak self] request, error in
-                guard let self else { return }
-
-                if let error {
-                    continuation.resume(throwing: AnalysisError.inferenceFailure(error.localizedDescription))
-                    return
+            Self.inferenceQueue.async {
+                do {
+                    continuation.resume(returning: try Self.detect(in: cgImage, using: session))
+                } catch let error as AnalysisError {
+                    continuation.resume(throwing: error)
+                } catch {
+                    continuation.resume(
+                        throwing: AnalysisError.inferenceFailure(error.localizedDescription))
                 }
-
-                guard
-                    let observation = request.results?.first as? VNCoreMLFeatureValueObservation,
-                    let tensor = observation.featureValue.multiArrayValue
-                else {
-                    continuation.resume(throwing: AnalysisError.inferenceFailure(
-                        "Output model tidak dikenali."))
-                    return
-                }
-
-                let (btaCount, avgConfidence) = self.decode(tensor)
-
-                // Per-field grade: treat each analyzed image as one field
-                let grade = BTAGrade.grade(for: btaCount, across: 1)
-
-                continuation.resume(returning: AnalysisResult(
-                    btaCount: btaCount,
-                    confidence: avgConfidence,
-                    grade: grade,
-                    analyzedAt: Date()
-                ))
             }
-            // Ultralytics letterboxes its input, so fit the whole frame rather than cropping
-            request.imageCropAndScaleOption = .scaleFit
+        }
+    }
 
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                continuation.resume(throwing: AnalysisError.inferenceFailure(error.localizedDescription))
-            }
+    // MARK: - Inference
+
+    private static func detect(in cgImage: CGImage, using session: ORTSession) throws -> AnalysisResult {
+        guard let planar = planarRGB(from: cgImage) else {
+            throw AnalysisError.invalidImage
+        }
+
+        // ORTValue does not copy: the caller owns the buffer and it has to outlive the run.
+        let inputData = NSMutableData(bytes: planar.pixels,
+                                      length: planar.pixels.count * MemoryLayout<Float>.stride)
+        let input = try ORTValue(
+            tensorData: inputData,
+            elementType: ORTTensorElementDataType.float,
+            shape: [3, NSNumber(value: planar.height), NSNumber(value: planar.width)]
+        )
+
+        // `labels` is deliberately not requested: the model has a single foreground class,
+        // so every detection is class 1 (AFB) and the tensor carries no information.
+        let outputs = try session.run(
+            withInputs: ["image": input],
+            outputNames: ["boxes", "scores"],
+            runOptions: nil
+        )
+
+        guard let boxesValue = outputs["boxes"], let scoresValue = outputs["scores"] else {
+            throw AnalysisError.inferenceFailure("Output model tidak dikenali.")
+        }
+
+        let scores = try floats(from: scoresValue.tensorData())
+        let boxCoords = try floats(from: boxesValue.tensorData())
+
+        // Each box is x1, y1, x2, y2 in the pixel space of the image we fed in.
+        let count = min(scores.count, boxCoords.count / 4)
+        guard count > 0 else {
+            return AnalysisResult(btaCount: 0, confidence: 0, grade: .negative, analyzedAt: Date())
+        }
+
+        let width = Float(planar.width)
+        let height = Float(planar.height)
+        let boxes = (0..<count).map { i -> DetectedBox in
+            let x1 = boxCoords[i * 4], y1 = boxCoords[i * 4 + 1]
+            let x2 = boxCoords[i * 4 + 2], y2 = boxCoords[i * 4 + 3]
+            return DetectedBox(
+                cx: ((x1 + x2) / 2) / width,
+                cy: ((y1 + y2) / 2) / height,
+                w: (x2 - x1) / width,
+                h: (y2 - y1) / height,
+                // Faster R-CNN boxes are axis-aligned. The previous detector was YOLO-OBB
+                // and `DetectedBox.angle` survives for it; there is no rotation to report.
+                angle: 0
+            )
+        }
+
+        let averageConfidence = Double(scores.prefix(count).reduce(0, +)) / Double(count)
+        resnetLog.note("input \(planar.width)x\(planar.height) -> \(count) deteksi, conf \(averageConfidence)")
+
+        return AnalysisResult(
+            btaCount: count,
+            confidence: averageConfidence,
+            grade: BTAGrade.grade(for: count, across: 1),
+            analyzedAt: Date(),
+            detectedBoxes: boxes
+        )
+    }
+
+    private static func floats(from data: NSMutableData) -> [Float] {
+        [Float](unsafeUninitializedCapacity: data.length / MemoryLayout<Float>.stride) { buffer, filled in
+            filled = data.length / MemoryLayout<Float>.stride
+            _ = data.copyBytes(to: buffer)
         }
     }
 
     // MARK: - Input framing
 
-    /// Redraws the photo upright and crops it to the largest centred square.
-    ///
-    /// Two things go wrong on a real device without this. A photo straight out of
-    /// `AVCapturePhotoOutput` carries its rotation in EXIF, which `VNImageRequestHandler`
-    /// ignores when handed a bare `CGImage` — the field would be analysed sideways. And
-    /// the frame is 4:3, so letterboxing it into the model's 1024x1024 input shrinks
-    /// every bacillus well below the ~13px it was trained at. Cropping to the square
-    /// that holds the circular microscope field restores the training-time scale.
-    /// On the simulator's already-square field this is a no-op beyond the redraw.
-    private static func uprightCenteredSquare(of image: UIImage) -> CGImage? {
-        let side = min(image.size.width, image.size.height)
-        guard side > 0 else { return nil }
+    /// Unpacks a `CGImage` into the planar RGB float tensor the graph expects: shape
+    /// (3, H, W), channel-first, values in 0...1. The ImageNet mean/std normalisation is
+    /// inside the graph, so it must *not* be applied here as well.
+    private static func planarRGB(from cgImage: CGImage) -> (pixels: [Float], width: Int, height: Int)? {
+        let width = cgImage.width
+        let height = cgImage.height
+        let pixelCount = width * height
+        guard pixelCount > 0 else { return nil }
 
-        let origin = CGPoint(
-            x: (image.size.width - side) / 2,
-            y: (image.size.height - side) / 2
-        )
+        var rgba = [UInt8](repeating: 0, count: pixelCount * 4)
+        guard let context = rgba.withUnsafeMutableBytes({ raw -> CGContext? in
+            CGContext(
+                data: raw.baseAddress,
+                width: width,
+                height: height,
+                bitsPerComponent: 8,
+                bytesPerRow: width * 4,
+                space: CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.noneSkipLast.rawValue
+            )
+        }) else { return nil }
 
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = image.scale
-        format.opaque = true
-        let renderer = UIGraphicsImageRenderer(
-            size: CGSize(width: side, height: side),
-            format: format
-        )
-        // `draw` applies imageOrientation, so what lands in the context is upright
-        let square = renderer.image { _ in
-            image.draw(at: CGPoint(x: -origin.x, y: -origin.y))
-        }
-        return square.cgImage
-    }
+        context.draw(cgImage, in: CGRect(x: 0, y: 0, width: width, height: height))
 
-    // MARK: - OBB decoding
-
-    /// Turns the raw (1, 6, anchors) YOLO-OBB tensor into a bacilli count.
-    /// Channel layout per anchor: cx, cy, w, h, score, angle.
-    private func decode(_ tensor: MLMultiArray) -> (count: Int, averageConfidence: Double) {
-        guard tensor.shape.count == 3, tensor.shape[1].intValue == 6 else { return (0, 0) }
-        let anchors = tensor.shape[2].intValue
-        guard anchors > 0, tensor.dataType == .float32 else { return (0, 0) }
-
-        let base = tensor.dataPointer.bindMemory(to: Float.self, capacity: 6 * anchors)
-        // strides are in elements, so they index the flat buffer directly
-        let channelStride = tensor.strides[1].intValue
-        let anchorStride = tensor.strides[2].intValue
-
-        func value(channel: Int, anchor: Int) -> Float {
-            base[channel * channelStride + anchor * anchorStride]
+        var planar = [Float](repeating: 0, count: pixelCount * 3)
+        for i in 0..<pixelCount {
+            planar[i] = Float(rgba[i * 4]) / 255
+            planar[pixelCount + i] = Float(rgba[i * 4 + 1]) / 255
+            planar[pixelCount * 2 + i] = Float(rgba[i * 4 + 2]) / 255
         }
 
-        var boxes: [OrientedBox] = []
-        var scores: [Float] = []
-        for i in 0..<anchors where value(channel: 4, anchor: i) >= confidenceThreshold {
-            boxes.append(OrientedBox(
-                cx: value(channel: 0, anchor: i),
-                cy: value(channel: 1, anchor: i),
-                w: value(channel: 2, anchor: i),
-                h: value(channel: 3, anchor: i),
-                angle: value(channel: 5, anchor: i)
-            ))
-            scores.append(value(channel: 4, anchor: i))
-        }
-        guard !boxes.isEmpty else { return (0, 0) }
-
-        let ranked = zip(boxes, scores)
-            .sorted { $0.1 > $1.1 }
-        let sortedBoxes = ranked.map(\.0)
-        let sortedScores = ranked.map(\.1)
-
-        let kept = suppress(sortedBoxes)
-        guard !kept.isEmpty else { return (0, 0) }
-
-        let total = kept.reduce(Float(0)) { $0 + sortedScores[$1] }
-        return (kept.count, Double(total) / Double(kept.count))
-    }
-
-    /// Rotated NMS over score-sorted boxes. Mirrors ultralytics' `nms_rotated`: a box is
-    /// dropped when *any* higher-scoring box overlaps it — including one already dropped.
-    private func suppress(_ boxes: [OrientedBox]) -> [Int] {
-        var kept: [Int] = []
-        for j in boxes.indices {
-            var overlapped = false
-            for i in 0..<j where probIoU(boxes[i], boxes[j]) >= iouThreshold {
-                overlapped = true
-                break
-            }
-            if !overlapped { kept.append(j) }
-        }
-        return kept
-    }
-
-    /// Probabilistic IoU: treats each oriented box as a Gaussian and compares them via
-    /// the Bhattacharyya distance. This is the overlap measure YOLO-OBB is trained with.
-    private func probIoU(_ a: OrientedBox, _ b: OrientedBox) -> Float {
-        let eps: Float = 1e-7
-
-        func covariance(_ box: OrientedBox) -> (Float, Float, Float) {
-            let vx = box.w * box.w / 12
-            let vy = box.h * box.h / 12
-            let cos = cosf(box.angle), sin = sinf(box.angle)
-            return (vx * cos * cos + vy * sin * sin,
-                    vx * sin * sin + vy * cos * cos,
-                    (vx - vy) * cos * sin)
-        }
-
-        let (a1, b1, c1) = covariance(a)
-        let (a2, b2, c2) = covariance(b)
-        let dx = b.cx - a.cx, dy = a.cy - b.cy
-
-        let den = (a1 + a2) * (b1 + b2) - (c1 + c2) * (c1 + c2)
-        let t1 = ((a1 + a2) * dy * dy + (b1 + b2) * dx * dx) / (den + eps) * 0.25
-        let t2 = ((c1 + c2) * dx * dy) / (den + eps) * 0.5
-        let d1 = max(a1 * b1 - c1 * c1, 0), d2 = max(a2 * b2 - c2 * c2, 0)
-        let t3 = log(den / (4 * sqrt(d1) * sqrt(d2) + eps) + eps) * 0.5
-
-        let bd = min(max(t1 + t2 + t3, eps), 100)
-        return 1 - sqrt(1 - exp(-bd) + eps)
+        return (planar, width, height)
     }
 }
