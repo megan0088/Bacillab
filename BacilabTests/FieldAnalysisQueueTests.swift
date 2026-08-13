@@ -150,10 +150,44 @@ struct FieldAnalysisQueueTests {
             queue.enqueue(fieldID: field.id, imageData: Data([0x01]), into: session)
         }
 
+        // `enqueue` tidak pernah `await`, jadi tanpa jeda ini seluruh loop plus `cancelAll()`
+        // berjalan sebagai satu blok sinkron sebelum pekerja sempat mengeksekusi satu baris
+        // pun — `callCount` akan 0 apa pun implementasinya, termasuk yang tidak pernah
+        // mengecek `Task.isCancelled` sama sekali. Jeda ini memastikan pekerja benar-benar
+        // mengambil dan memulai lapang pertama sebelum dibatalkan.
+        try? await Task.sleep(for: .milliseconds(5))
+
         queue.cancelAll()
         await queue.waitUntilIdle()
 
         #expect(queue.remaining == 0)
-        #expect(service.callCount < 10, "Antrean yang dibatalkan tetap menghabiskan semua pekerjaan")
+        #expect(service.callCount == 1,
+                "Lapang pertama yang sudah telanjur jalan boleh selesai, tapi sisanya harus berhenti")
+    }
+
+    @Test("Lapang yang diantre setelah cancelAll() tetap diproses pekerja baru")
+    func enqueueAfterCancelStartsFreshWorker() async {
+        let service = StubAnalysisService()
+        let queue = FieldAnalysisQueue(analysisService: service)
+        let session = ExamSession()
+
+        let first = session.appendField(imageFileName: "f.jpg")
+        queue.enqueue(fieldID: first.id, imageData: Data([0x01]), into: session)
+
+        // Biarkan pekerja benar-benar mulai menganalisis `first` sebelum dibatalkan, supaya
+        // `cancelAll()` betul-betul balapan dengan pekerja yang sedang di tengah `analyse`,
+        // bukan dengan pekerja yang belum sempat jalan sama sekali.
+        try? await Task.sleep(for: .milliseconds(5))
+
+        queue.cancelAll()
+
+        let second = session.appendField(imageFileName: "f.jpg")
+        queue.enqueue(fieldID: second.id, imageData: Data([0x01]), into: session)
+
+        await queue.waitUntilIdle()
+
+        #expect(session.field(withID: second.id)?.analysis != nil,
+                "Lapang yang diantre setelah cancelAll() harus tetap dianalisis oleh pekerja baru")
+        #expect(queue.remaining == 0)
     }
 }
