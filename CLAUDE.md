@@ -67,9 +67,9 @@ already discards everything below 0.70 — so it cannot read lower than 70% no m
 the field is. It says how sure the model is about the bacilli **it kept**, not how confident
 anyone should be in the count. Do not present it as the latter.
 
-Review menampilkannya sebagai "Model yakin N% atas basil yang ia tandai", bukan sebagai angka
-keyakinan hasil. Grafik ONNX membuang deteksi di bawah 0,70, jadi angka itu tidak pernah bisa
-terbaca di bawah 70%.
+Review displays it as "Model yakin N% atas basil yang ia tandai" ("The model is N% confident in
+the bacilli it flagged") — not as a confidence figure for the result. The ONNX graph discards
+detections below 0.70, so the number can never read below 70%.
 
 ### Every scanned field counts — including empty ones
 `ScanViewModel.captureField` appends a field whenever the image is written to disk, whether or
@@ -139,10 +139,11 @@ Every field is read by all three models; only one of them ever grades:
 service and any difference in counts becomes part framing and part model, inseparably.
 
 **ResNet is unconditionally the grading detector — `FieldAnalysisQueue` hardcodes it.** There is
-no analyst picker any more: `DetectorSelection` / `gradingDetector` still exist inside
-`MultiDetectorService`, but every field is analysed with `.all` and `primary: .resnet`. YOLO and
-YOLO11 ride along only to be shown beside ResNet's count in Review — averaging the three would
-produce a count none of them made, so neither ever becomes the number of record.
+no analyst picker any more: `DetectorSelection` / `gradingDetector` are still declared in
+`AnalysisResult.swift` and referenced from `MultiDetectorService`, but every field is analysed
+with `.all` and `primary: .resnet`. YOLO and YOLO11 ride along only to be shown beside ResNet's
+count in Review — averaging the three would produce a count none of them made, so neither ever
+becomes the number of record.
 
 ### Every field's readings are stored once, on that field — nothing left to relabel
 `FieldRecord.analysis` (a `FieldAnalysis`) is set once by `FieldAnalysisQueue` and carries all

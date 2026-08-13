@@ -46,10 +46,34 @@ struct FieldAnalysisQueueTests {
         }
     }
 
+    /// Mencatat tiap sesi yang disimpan, supaya test bisa memeriksa bahwa hasil analisis
+    /// sungguh sampai ke disk — bukan hanya bertahan di `ExamSession` yang ada di memori.
+    private final class SpyStore: SessionStoreProtocol, @unchecked Sendable {
+        private let lock = NSLock()
+        private var _savedSessions: [ExamSession] = []
+
+        var savedSessions: [ExamSession] {
+            lock.lock(); defer { lock.unlock() }
+            return _savedSessions
+        }
+
+        func allSessions() async throws -> [ExamSession] { [] }
+        func save(_ session: ExamSession) async throws {
+            lock.lock()
+            _savedSessions.append(session)
+            lock.unlock()
+        }
+        func delete(_ session: ExamSession) async throws {}
+        func writeFieldImage(_ data: Data, fileName: String, for session: ExamSession) throws {}
+        func fieldImageURL(fileName: String, for session: ExamSession) -> URL {
+            FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        }
+    }
+
     @Test("Semua lapang yang diantre akhirnya teranalisis")
     func allQueuedFieldsGetAnalysed() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         for _ in 0..<5 {
@@ -69,7 +93,7 @@ struct FieldAnalysisQueueTests {
     @Test("Analisis berjalan satu per satu, bukan bersamaan")
     func analysisRunsSerially() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         for _ in 0..<6 {
@@ -87,7 +111,7 @@ struct FieldAnalysisQueueTests {
     func failureBecomesManualCountField() async {
         let service = StubAnalysisService()
         service.failEveryCall = true
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         let field = session.appendField(imageFileName: "f.jpg")
@@ -104,7 +128,7 @@ struct FieldAnalysisQueueTests {
     @Test("Satu lapang gagal tidak menghentikan sisanya")
     func oneFailureDoesNotStopTheQueue() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         let first = session.appendField(imageFileName: "f.jpg")
@@ -126,7 +150,7 @@ struct FieldAnalysisQueueTests {
     @Test("Sisa antrean turun sampai nol")
     func remainingDropsToZero() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         for _ in 0..<3 {
@@ -142,7 +166,7 @@ struct FieldAnalysisQueueTests {
     @Test("Membatalkan antrean menghentikan pekerjaan yang belum jalan")
     func cancelStopsPendingWork() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         for _ in 0..<10 {
@@ -168,7 +192,7 @@ struct FieldAnalysisQueueTests {
     @Test("Lapang yang diantre setelah cancelAll() tetap diproses pekerja baru")
     func enqueueAfterCancelStartsFreshWorker() async {
         let service = StubAnalysisService()
-        let queue = FieldAnalysisQueue(analysisService: service)
+        let queue = FieldAnalysisQueue(analysisService: service, store: SpyStore())
         let session = ExamSession()
 
         let first = session.appendField(imageFileName: "f.jpg")
@@ -189,5 +213,31 @@ struct FieldAnalysisQueueTests {
         #expect(session.field(withID: second.id)?.analysis != nil,
                 "Lapang yang diantre setelah cancelAll() harus tetap dianalisis oleh pekerja baru")
         #expect(queue.remaining == 0)
+    }
+
+    @Test("Sesi tersimpan ke disk setelah satu lapang selesai dianalisis")
+    func sessionIsPersistedAfterFieldAnalysis() async {
+        let service = StubAnalysisService()
+        service.countPerField = 6
+        let store = SpyStore()
+        let queue = FieldAnalysisQueue(analysisService: service, store: store)
+        let session = ExamSession()
+
+        let field = session.appendField(imageFileName: "f.jpg")
+        queue.enqueue(fieldID: field.id, imageData: Data([0x01]), into: session)
+
+        await queue.waitUntilIdle()
+        // `persist` di dalam antrean sengaja fire-and-forget (lihat dokumentasinya) — pekerja
+        // tidak menunggunya, jadi `waitUntilIdle()` saja tidak menjamin tulisan ini sudah
+        // selesai. Jeda singkat ini memakai pola yang sama dengan autosave Review di
+        // `ReviewViewModelTests` untuk kasus fire-and-forget yang serupa.
+        try? await Task.sleep(for: .milliseconds(20))
+
+        #expect(!store.savedSessions.isEmpty,
+                "Sesi harus tersimpan setelah lapang selesai dianalisis, bukan cuma tinggal di memori")
+        let saved = store.savedSessions.last
+        #expect(saved?.field(withID: field.id)?.analysis != nil,
+                "Simpanan harus membawa hasil analisis lapang ini")
+        #expect(saved?.totalBTA == 6)
     }
 }

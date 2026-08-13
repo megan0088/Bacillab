@@ -14,6 +14,13 @@ private let queueLog = Diag("antrean")
 ///
 /// Di-`@MainActor` karena ia memutasi `ExamSession` yang `@Observable` dan menggerakkan UI.
 /// Kerja beratnya tetap di luar: `MultiDetectorService` menjalankan ORT di antrean privatnya.
+///
+/// **Menyimpan sesi setelah tiap lapang selesai dianalisis, bukan hanya menyimpannya di
+/// memori.** `ScanViewModel.captureField` menyimpan sebelum analisis selesai, dan Review baru
+/// menyimpan lagi saat analis mengoreksi sesuatu — di antara keduanya, hasil model yang sudah
+/// jadi hanya ada di `ExamSession` yang `@Observable`. Kalau app dibunuh persis di jendela itu,
+/// lapang yang sudah selesai dianalisis kembali dengan `analysis: nil` saat sesi dibuka lagi,
+/// dan tidak ada apa pun yang mengantrekannya ulang — lapang itu tertahan `pending` selamanya.
 @MainActor
 @Observable
 final class FieldAnalysisQueue {
@@ -29,6 +36,7 @@ final class FieldAnalysisQueue {
     }
 
     private let analysisService: any AnalysisServiceProtocol
+    private let store: any SessionStoreProtocol
     private var jobs: [Job] = []
     private var worker: Task<Void, Never>?
 
@@ -43,8 +51,9 @@ final class FieldAnalysisQueue {
     /// Berapa lapang masih menunggu, untuk ditampilkan sebagai "menganalisis n dari m".
     private(set) var remaining = 0
 
-    init(analysisService: any AnalysisServiceProtocol) {
+    init(analysisService: any AnalysisServiceProtocol, store: any SessionStoreProtocol) {
         self.analysisService = analysisService
+        self.store = store
     }
 
     func enqueue(fieldID: UUID, imageData: Data, into session: ExamSession) {
@@ -89,6 +98,7 @@ final class FieldAnalysisQueue {
         while generation == myGeneration, !Task.isCancelled, let job = takeNextJob() {
             let analysis = await analyse(job)
             job.session.setAnalysis(analysis, for: job.fieldID)
+            persist(job.session)
             guard generation == myGeneration else { return }
             remaining = jobs.count
         }
@@ -99,6 +109,30 @@ final class FieldAnalysisQueue {
 
     private func takeNextJob() -> Job? {
         jobs.isEmpty ? nil : jobs.removeFirst()
+    }
+
+    /// Menyimpan sesi ke disk setelah satu lapang selesai dianalisis.
+    ///
+    /// Fire-and-forget dengan sengaja, mengikuti bentuk `ReviewViewModel.persist()`: pekerja
+    /// TIDAK menunggu tulisan ini sebelum mengambil lapang berikutnya. Kalau menunggu, laju
+    /// antrean akan tersandera I/O disk — persis hal yang ingin dihindari dengan menjalankan
+    /// analisis di latar sejak awal. Kegagalan dilaporkan lewat log, bukan dilempar: tidak ada
+    /// pihak yang menunggu hasil panggilan ini untuk bisa "membatalkan" apa pun.
+    ///
+    /// Aman berjalan bersamaan dengan simpanan lain untuk sesi yang sama (mis.
+    /// `ReviewViewModel.persist()` kalau analis mengoreksi satu lapang sementara lapang lain
+    /// masih diantre) — `SessionStore` tidak punya state bersama antar-panggilan `save`, tiap
+    /// panggilan membawa snapshot `ExamSession` yang utuh, dan keduanya adalah `Task` yang
+    /// mewarisi `@MainActor` ini, jadi tulisan yang datang belakangan menggantikan yang lebih
+    /// dulu, bukan merusaknya.
+    private func persist(_ session: ExamSession) {
+        Task { [store] in
+            do {
+                try await store.save(session)
+            } catch {
+                queueLog.error("Simpan sesi setelah analisis gagal: \(error.localizedDescription)")
+            }
+        }
     }
 
     private func analyse(_ job: Job) async -> FieldAnalysis {

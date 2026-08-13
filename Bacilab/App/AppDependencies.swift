@@ -21,6 +21,6 @@ final class AppDependencies {
     /// dalam satu urutan, dan membatalkan salah satunya akan membatalkan keduanya.
     @MainActor
     func makeAnalysisQueue() -> FieldAnalysisQueue {
-        FieldAnalysisQueue(analysisService: analysisService)
+        FieldAnalysisQueue(analysisService: analysisService, store: sessionStore)
     }
 }

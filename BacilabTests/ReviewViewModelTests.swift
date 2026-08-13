@@ -50,7 +50,7 @@ struct ReviewViewModelTests {
         ReviewViewModel(
             session: session,
             store: store,
-            queue: FieldAnalysisQueue(analysisService: SilentAnalysis())
+            queue: FieldAnalysisQueue(analysisService: SilentAnalysis(), store: store)
         )
     }
 

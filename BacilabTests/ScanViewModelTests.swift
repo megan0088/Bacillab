@@ -80,10 +80,16 @@ struct ScanViewModelTests {
         store: SessionStoreProtocol,
         analysis: AnalysisServiceProtocol = SilentAnalysis()
     ) -> ScanViewModel {
+        // Antrean sengaja dapat `SpyStore` sendiri, terpisah dari `store` di atas: tulisannya
+        // berjalan di latar dan tidak ditunggu (lihat `FieldAnalysisQueue.persist`), jadi kalau
+        // ia berbagi `store` yang sama dengan ScanViewModel, `store.savedCount` di test yang
+        // tidak memanggil `queue.waitUntilIdle()` (mis. `eachFieldIsPersisted`) bisa berubah
+        // kapan saja pekerja antrean kebetulan selesai — persis kerapuhan yang mau dihindari.
+        // Persistensi milik antrean sendiri diuji di `FieldAnalysisQueueTests`.
         ScanViewModel(
             cameraService: camera,
             store: store,
-            queue: FieldAnalysisQueue(analysisService: analysis)
+            queue: FieldAnalysisQueue(analysisService: analysis, store: SpyStore())
         )
     }
 
