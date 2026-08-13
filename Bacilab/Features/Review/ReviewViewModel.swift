@@ -140,6 +140,7 @@ final class ReviewViewModel {
         let previousStatus = session.status
         session.status = .published
         do {
+            errorMessage = nil
             try await store.save(session)
             isPublished = true
         } catch {
@@ -164,6 +165,7 @@ final class ReviewViewModel {
         Task { [weak self] in
             guard let self else { return }
             do {
+                self.errorMessage = nil
                 try await self.store.save(self.session)
             } catch {
                 self.errorMessage = error.localizedDescription

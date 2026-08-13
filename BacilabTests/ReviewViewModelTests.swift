@@ -73,9 +73,10 @@ struct ReviewViewModelTests {
     }
 
     @Test("Keypad menulis koreksi ke lapang terpilih")
-    func keypadWritesCorrection() {
+    func keypadWritesCorrection() async {
+        let store = SpyStore()
         let session = makeSession(counts: [9, 9])
-        let vm = makeViewModel(session)
+        let vm = makeViewModel(session, store: store)
 
         vm.openKeypad()
         vm.appendDigit("1"); vm.appendDigit("2")
@@ -84,12 +85,16 @@ struct ReviewViewModelTests {
         #expect(session.fields[0].correctedCount == 12)
         #expect(session.totalBTA == 21, "12 + 9")
         #expect(!vm.isKeypadPresented)
+
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(store.savedCount == 1, "Koreksi harus benar-benar tersimpan, bukan cuma di memori")
     }
 
     @Test("Koreksi nol tersimpan sebagai nol, bukan diabaikan")
-    func zeroCorrectionIsStored() {
+    func zeroCorrectionIsStored() async {
+        let store = SpyStore()
         let session = makeSession(counts: [7])
-        let vm = makeViewModel(session)
+        let vm = makeViewModel(session, store: store)
 
         vm.openKeypad()
         vm.appendDigit("0")
@@ -98,6 +103,9 @@ struct ReviewViewModelTests {
         #expect(session.fields[0].correctedCount == 0)
         #expect(session.totalBTA == 0)
         #expect(session.examinedFieldCount == 1, "Nol tetap lapang yang terbaca")
+
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(store.savedCount == 1, "Nol tetap koreksi yang harus tersimpan ke disk")
     }
 
     @Test("Keypad kosong yang dikonfirmasi tidak mengubah apa pun")
@@ -128,9 +136,10 @@ struct ReviewViewModelTests {
     }
 
     @Test("Koreksi bisa dikembalikan ke hitungan model")
-    func correctionCanBeCleared() {
+    func correctionCanBeCleared() async {
+        let store = SpyStore()
         let session = makeSession(counts: [7])
-        let vm = makeViewModel(session)
+        let vm = makeViewModel(session, store: store)
 
         vm.openKeypad(); vm.appendDigit("2"); vm.commitKeypad()
         #expect(session.totalBTA == 2)
@@ -138,12 +147,16 @@ struct ReviewViewModelTests {
         vm.clearCorrection()
         #expect(session.fields[0].correctedCount == nil)
         #expect(session.totalBTA == 7, "Kembali ke angka model")
+
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(store.savedCount == 2, "Koreksi maupun pembatalannya sama-sama harus tersimpan")
     }
 
     @Test("Membuang lapang mengubah total dan penyebut sekaligus")
-    func excludingChangesBothSides() {
+    func excludingChangesBothSides() async {
+        let store = SpyStore()
         let session = makeSession(counts: [4, 4, 4])
-        let vm = makeViewModel(session)
+        let vm = makeViewModel(session, store: store)
 
         vm.toggleExcludedOnSelected()
 
@@ -152,6 +165,9 @@ struct ReviewViewModelTests {
 
         vm.toggleExcludedOnSelected()
         #expect(session.examinedFieldCount == 3, "Bisa dikembalikan")
+
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(store.savedCount == 2, "Membuang maupun mengembalikan lapang sama-sama harus tersimpan")
     }
 
     @Test("Grade yang dipilih tersimpan di sesi")
@@ -206,5 +222,23 @@ struct ReviewViewModelTests {
         #expect(!vm.isPublished, "Hasil yang tidak tersimpan tidak boleh tampak terbit")
         #expect(vm.errorMessage != nil)
         #expect(session.status != .published)
+    }
+
+    @Test("Pesan galat hilang begitu penyimpanan berikutnya berhasil")
+    func errorMessageClearsAfterSuccessfulSave() async {
+        let store = SpyStore()
+        store.saveError = CocoaError(.fileWriteOutOfSpace)
+        let session = makeSession(counts: [7])
+        let vm = makeViewModel(session, store: store)
+
+        vm.openKeypad(); vm.appendDigit("3"); vm.commitKeypad()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(vm.errorMessage != nil, "Penyimpanan yang gagal harus terlihat")
+
+        store.saveError = nil
+        vm.openKeypad(); vm.appendDigit("4"); vm.commitKeypad()
+        try? await Task.sleep(for: .milliseconds(20))
+        #expect(vm.errorMessage == nil,
+                "Pesan galat lama tidak boleh bertahan setelah koreksi berikutnya tersimpan")
     }
 }
