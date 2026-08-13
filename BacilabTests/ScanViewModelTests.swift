@@ -44,11 +44,15 @@ struct ScanViewModelTests {
         var savedCount = 0
         var writtenFiles: [String] = []
         var writeError: Error?
+        var saveError: Error?
         let root = FileManager.default.temporaryDirectory
             .appendingPathComponent("ScanViewModelTests-\(UUID().uuidString)")
 
         func allSessions() async throws -> [ExamSession] { [] }
-        func save(_ session: ExamSession) async throws { savedCount += 1 }
+        func save(_ session: ExamSession) async throws {
+            if let saveError { throw saveError }
+            savedCount += 1
+        }
         func delete(_ session: ExamSession) async throws {}
         func writeFieldImage(_ data: Data, fileName: String, for session: ExamSession) throws {
             if let writeError { throw writeError }
@@ -197,5 +201,75 @@ struct ScanViewModelTests {
         await vm.queue.waitUntilIdle()
 
         #expect(session.totalBTA == 7, "Hasil antrean tidak sampai ke sesi")
+    }
+
+    @Test("Gagal menyimpan sesi tidak menghalangi lapang dianalisis")
+    func saveFailureStillQueuesAnalysis() async {
+        let store = SpyStore()
+        store.saveError = CocoaError(.fileWriteOutOfSpace)
+        let analysis = SilentAnalysis()
+        analysis.btaCount = 5
+        let vm = makeViewModel(camera: StubCamera(payload: jpegBytes()), store: store,
+                               analysis: analysis)
+        let session = ExamSession()
+
+        await vm.captureField(session: session)
+
+        #expect(session.fields.count == 1,
+                "Gambarnya sudah tersimpan di disk — lapang tetap dicatat walau sesi gagal disimpan")
+        #expect(vm.errorMessage != nil, "Kegagalan simpan sesi tetap harus dilaporkan")
+
+        await vm.queue.waitUntilIdle()
+
+        #expect(session.totalBTA == 5,
+                "Lapang tidak boleh tertahan pending selamanya hanya karena sesi gagal disimpan")
+    }
+
+    @Test("Auto-scan berhenti tepat di batchTarget")
+    func autoScanStopsAtBatchTarget() async {
+        let store = SpyStore()
+        let vm = makeViewModel(camera: StubCamera(payload: jpegBytes()), store: store)
+        vm.scanIntervalMilliseconds = 1
+        let session = ExamSession()
+
+        vm.toggleScan(session: session)
+
+        var waited = 0
+        while vm.isScanning, waited < 5000 {
+            try? await Task.sleep(for: .milliseconds(25))
+            waited += 25
+        }
+
+        #expect(session.fields.count == ExamSession.batchTarget,
+                "Loop harus berhenti tepat di batchTarget, bukan lebih atau kurang")
+        #expect(vm.isScanning == false)
+    }
+
+    @Test("stopScan menghentikan loop sebelum batchTarget dan membersihkan isScanning")
+    func stopScanEndsLoopMidFlight() async {
+        let store = SpyStore()
+        let vm = makeViewModel(camera: StubCamera(payload: jpegBytes()), store: store)
+        vm.scanIntervalMilliseconds = 50
+        let session = ExamSession()
+
+        vm.toggleScan(session: session)
+        #expect(vm.isScanning)
+
+        try? await Task.sleep(for: .milliseconds(120))
+        vm.stopScan()
+
+        #expect(vm.isScanning == false)
+
+        // Beri jeda singkat untuk capture yang mungkin masih berjalan saat stopScan dipanggil.
+        try? await Task.sleep(for: .milliseconds(50))
+        let countAfterStop = session.fields.count
+        #expect(countAfterStop > 0)
+        #expect(countAfterStop < ExamSession.batchTarget,
+                "Kalau sudah mencapai batchTarget, test ini tidak menguji apa-apa")
+
+        // Tidak boleh ada lapang baru bertambah setelah dihentikan.
+        try? await Task.sleep(for: .milliseconds(300))
+        #expect(session.fields.count == countAfterStop,
+                "stopScan harus benar-benar menghentikan loop, bukan cuma menunda")
     }
 }

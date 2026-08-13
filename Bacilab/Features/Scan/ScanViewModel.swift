@@ -90,13 +90,21 @@ final class ScanViewModel {
 
     // MARK: - Satu lapang
 
-    /// Merekam satu lapang: potret → potong → tulis → catat → antre.
+    /// Merekam satu lapang: potret → potong → tulis → catat → antre → simpan.
     ///
     /// Urutannya penting. Lapang baru dicatat ke sesi **setelah** berkasnya tertulis, supaya
     /// disk yang penuh tidak meninggalkan lapang yang gambarnya tidak ada. Dan lapang selalu
     /// dicatat kalau berkasnya tersimpan — ada BTA maupun tidak. Auto-scan lama hanya menambah
     /// ketika modelnya menemukan sesuatu, sehingga lapang kosong tidak pernah masuk penyebut
     /// dan grade Negatif secara struktural tidak bisa dicapai.
+    ///
+    /// `queue.enqueue` terjadi **sebelum** `store.save`, dengan sengaja. Kalau `save` gagal —
+    /// disk penuh di tengah sesi, misalnya — lapangnya sudah tercatat (gambarnya sudah aman di
+    /// disk) dan errornya tetap dilaporkan, tapi tanpa urutan ini lapang itu akan tertahan
+    /// `pending` selamanya: tidak ada jalan lain untuk mengantrekannya lagi, padahal gambarnya
+    /// sudah ada dan modelnya menganggur. `enqueue` sendiri tidak pernah throw, jadi
+    /// menempatkannya sebelum `save` tidak mengubah kapan lapang dicatat atau kapan error
+    /// muncul — hanya memastikan analisis tidak ikut gagal gara-gara penyimpanan sesi gagal.
     func captureField(session: ExamSession) async {
         do {
             let raw = try await cameraService.captureImage()
@@ -112,8 +120,8 @@ final class ScanViewModel {
             try store.writeFieldImage(jpeg, fileName: fileName, for: session)
 
             let field = session.appendField(imageFileName: fileName)
-            try await store.save(session)
             queue.enqueue(fieldID: field.id, imageData: jpeg, into: session)
+            try await store.save(session)
 
             scanLog.note("lapang \(field.index) direkam, \(jpeg.count) bita")
         } catch {
