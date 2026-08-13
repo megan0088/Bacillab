@@ -2,7 +2,7 @@ import Foundation
 
 // Normalized bounding box for one detected bacterium.
 // Coordinates are in [0, 1] relative to the model's 1024×1024 input square.
-struct DetectedBox: Hashable, Sendable {
+struct DetectedBox: Hashable, Sendable, Codable {
     let cx: Float      // center x, normalized
     let cy: Float      // center y, normalized
     let w: Float       // width, normalized
@@ -12,7 +12,7 @@ struct DetectedBox: Hashable, Sendable {
 
 /// Which model produced a reading. Both are bundled so the two can be compared on the
 /// same field; see `DualDetectorService`.
-enum DetectorKind: String, Hashable, Sendable, CaseIterable {
+enum DetectorKind: String, Hashable, Sendable, CaseIterable, Codable {
     /// Faster R-CNN ResNet50-FPN, ONNX Runtime. Drives the clinical count.
     case resnet = "ResNet"
     /// YOLOv8s-OBB, CoreML. Comparison only — never feeds the grade.
@@ -73,7 +73,7 @@ enum DetectorSelection: String, Hashable, Sendable, CaseIterable, Identifiable {
 ///
 /// Kept separate from `AnalysisResult` because a reading is just a number and how long it
 /// took; only the primary detector's reading carries a grade and boxes into the flow.
-struct DetectorReading: Hashable, Sendable {
+struct DetectorReading: Hashable, Sendable, Codable {
     let detector: DetectorKind
     let btaCount: Int
     let confidence: Double
@@ -144,7 +144,7 @@ struct AnalysisResult: Hashable, Sendable {
     }
 }
 
-enum BTAGrade: String, Hashable, CaseIterable, Sendable {
+enum BTAGrade: String, Hashable, CaseIterable, Sendable, Codable {
     case negative = "Negatif"
     case scanty   = "Scanty"
     case plus1    = "1+"
