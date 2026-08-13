@@ -78,6 +78,15 @@ struct FieldRecordTests {
         #expect(!f.needsManualCount, "Lapang yang dibuang tidak perlu dihitung manual")
     }
 
+    @Test("Lapang yang dibuang sebelum dianalisis tidak dianggap masih mengantre")
+    func excludedBeforeAnalysisIsNotPending() {
+        let f = field(excluded: true)
+        #expect(!f.isPending, "Lapang yang sudah dibuang bukan lapang yang menunggu giliran")
+        #expect(!f.isCounted)
+        #expect(!f.needsManualCount)
+        #expect(f.effectiveCount == nil)
+    }
+
     @Test("Data pasien lengkap butuh nama dan nomor rekam medis")
     func patientCompleteness() {
         var p = PatientInfo()

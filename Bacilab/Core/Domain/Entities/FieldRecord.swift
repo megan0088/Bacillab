@@ -71,5 +71,7 @@ struct FieldRecord: Identifiable, Codable, Hashable, Sendable {
     }
 
     /// Masih menunggu giliran di antrean analisis.
-    var isPending: Bool { analysis == nil && correctedCount == nil }
+    ///
+    /// Lapang yang sudah dibuang (sebelum atau sesudah analisis) tidak menunggu lagi.
+    var isPending: Bool { !isExcluded && analysis == nil && correctedCount == nil }
 }
