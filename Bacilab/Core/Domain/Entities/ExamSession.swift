@@ -145,3 +145,8 @@ final class ExamSession: Identifiable {
         }
     }
 }
+
+extension ExamSession: Hashable {
+    static func == (lhs: ExamSession, rhs: ExamSession) -> Bool { lhs.id == rhs.id }
+    func hash(into hasher: inout Hasher) { hasher.combine(id) }
+}

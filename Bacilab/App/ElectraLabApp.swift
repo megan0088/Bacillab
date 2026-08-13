@@ -8,7 +8,7 @@ struct ElectraLabApp: App {
         WindowGroup {
             SampleListView(
                 viewModel: SampleListViewModel(
-                    sampleRepository: dependencies.sampleRepository
+                    sessionStore: dependencies.sessionStore
                 )
             )
             .environment(dependencies)
