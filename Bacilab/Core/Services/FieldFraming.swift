@@ -43,4 +43,35 @@ enum FieldFraming {
         }
         return square.cgImage
     }
+
+    /// Sisi maksimum berkas lapang yang disimpan.
+    ///
+    /// Transform Faster R-CNN memakai `min_size=1200, max_size=1600`, jadi apa pun di atas
+    /// 1600 px akan dikecilkan lagi oleh model sendiri. Menyimpan lebih besar hanya memakan
+    /// disk — dan sesi 20 lapang sudah puluhan megabita.
+    static let maxAnalysisSide: CGFloat = 1600
+
+    /// Berkas lapang siap-analisis: tegak, persegi, dan tidak lebih besar dari yang dipakai model.
+    ///
+    /// Analisis berjalan belakangan dari berkas ini, jadi ia harus berisi piksel yang sama
+    /// dengan yang akan dilihat detektor. Thumbnail tidak cukup.
+    static func analysisJPEG(of image: UIImage) -> Data? {
+        guard let square = uprightCenteredSquare(of: image) else { return nil }
+
+        let sourceSide = CGFloat(square.width)
+        // Tidak pernah memperbesar: menaikkan resolusi tidak menambah informasi apa pun.
+        let side = min(sourceSide, maxAnalysisSide)
+
+        let format = UIGraphicsImageRendererFormat.default()
+        format.scale = 1
+        format.opaque = true
+        let resized = UIGraphicsImageRenderer(
+            size: CGSize(width: side, height: side),
+            format: format
+        ).image { _ in
+            UIImage(cgImage: square).draw(in: CGRect(x: 0, y: 0, width: side, height: side))
+        }
+
+        return resized.jpegData(compressionQuality: 0.9)
+    }
 }
