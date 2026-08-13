@@ -107,7 +107,7 @@ struct YOLO11DetectorTests {
 
     @Test("Setiap model punya warna dan pola garis yang berbeda")
     func everyModelIsVisuallyDistinct() {
-        let dashes = DetectorKind.allCases.map { CaptureView.dash(for: $0) }
+        let dashes = DetectorKind.allCases.map { DetectorStyle.dash(for: $0) }
         // Colour alone cannot carry three categories for a colour-blind reader, so the dash
         // patterns have to differ too.
         #expect(Set(dashes.map(\.description)).count == DetectorKind.allCases.count,

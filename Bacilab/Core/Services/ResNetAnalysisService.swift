@@ -70,7 +70,7 @@ final class ResNetAnalysisService: AnalysisServiceProtocol {
     ///
     /// Those figures come from fold 4's own validation split and are the best of the five
     /// folds; the 5-fold mean is AP50 0.72 / count MAE 1.81. Neither has been checked
-    /// against slides read at Klinik Bunda.
+    /// against slides read at Electra Lab.
     func analyze(imageData: Data) async throws -> AnalysisResult {
         guard let uiImage = UIImage(data: imageData),
               let cgImage = FieldFraming.uprightCenteredSquare(of: uiImage) else {

@@ -1,11 +1,25 @@
 import Testing
 @testable import Bacilab
 
-/// WHO/IUATLD scales the reading effort to the density: a heavy smear declares itself
-/// within ~20 fields, while Negatif and Scanty are only reportable after the full 100.
-/// The asymmetry is deliberate — under-reading a sparse slide is what sends an
-/// infectious patient home untreated.
+/// WHO/IUATLD menskalakan beban baca pada kepadatan: smear berat mengumumkan dirinya dalam
+/// ~20 lapang, sedangkan Negatif dan Scanty baru boleh dilaporkan setelah 100 lapang penuh.
+/// Asimetrinya disengaja — membaca terlalu sedikit pada slide yang jarang adalah yang
+/// memulangkan pasien menular tanpa pengobatan.
 struct GradeThresholdTests {
+
+    private func session(fieldCount: Int, btaPerField: Int) -> ExamSession {
+        let session = ExamSession()
+        for _ in 0..<fieldCount {
+            let field = session.appendField(imageFileName: "f.jpg")
+            session.setAnalysis(
+                FieldAnalysis(
+                    readings: [DetectorReading(detector: .resnet, btaCount: btaPerField,
+                                               confidence: 0.8, elapsed: 0.4)],
+                    primary: .resnet),
+                for: field.id)
+        }
+        return session
+    }
 
     @Test("Ambang lapang pandang sesuai WHO/IUATLD")
     func minimumFieldsPerGrade() {
@@ -18,56 +32,44 @@ struct GradeThresholdTests {
 
     @Test("Negatif tidak boleh final sebelum 100 lapang pandang")
     func negativeNeedsFullReading() {
-        let draft = SampleDraft()
-        draft.grade = .negative
+        let twenty = session(fieldCount: 20, btaPerField: 0)
+        #expect(twenty.reportedGrade == .negative)
+        #expect(!twenty.isGradeConfirmed, "Negatif setelah 20 lapang tidak boleh final")
+        #expect(twenty.fieldsRemainingForGrade == 80)
 
-        draft.capturedFieldCount = 20
-        #expect(!draft.isGradeConfirmed, "Negatif setelah 20 lapang tidak boleh final")
-        #expect(draft.fieldsRemainingForGrade == 80)
+        let ninetyNine = session(fieldCount: 99, btaPerField: 0)
+        #expect(!ninetyNine.isGradeConfirmed)
 
-        draft.capturedFieldCount = 99
-        #expect(!draft.isGradeConfirmed)
-
-        draft.capturedFieldCount = 100
-        #expect(draft.isGradeConfirmed)
-        #expect(draft.fieldsRemainingForGrade == 0)
+        let hundred = session(fieldCount: 100, btaPerField: 0)
+        #expect(hundred.isGradeConfirmed)
+        #expect(hundred.fieldsRemainingForGrade == 0)
     }
 
     @Test("3+ sudah bisa final setelah 20 lapang pandang")
     func heavySmearConfirmsEarly() {
-        let draft = SampleDraft()
-        draft.grade = .plus3
-
-        draft.capturedFieldCount = 19
-        #expect(!draft.isGradeConfirmed)
-
-        draft.capturedFieldCount = 20
-        #expect(draft.isGradeConfirmed)
+        #expect(!session(fieldCount: 19, btaPerField: 15).isGradeConfirmed)
+        #expect(session(fieldCount: 20, btaPerField: 15).isGradeConfirmed)
     }
 
     @Test("Satu lapang pandang tidak pernah menghasilkan grade final")
     func singleFieldIsNeverFinal() {
         for grade in BTAGrade.allCases {
-            let draft = SampleDraft()
-            draft.grade = grade
-            draft.capturedFieldCount = 1
-
-            #expect(!draft.isGradeConfirmed,
+            let s = session(fieldCount: 1, btaPerField: 5)
+            s.chooseGrade(grade)
+            #expect(!s.isGradeConfirmed,
                     "\(grade.rawValue) dianggap final hanya dari 1 lapang pandang")
         }
     }
 
-    @Test("Grade sementara ikut naik saat lapang pandang bertambah")
+    @Test("Ambang mengikuti grade yang sedang berlaku")
     func thresholdFollowsCurrentGrade() {
-        let draft = SampleDraft()
-        draft.capturedFieldCount = 30
+        let s = session(fieldCount: 30, btaPerField: 15)
 
-        // At 30 fields a 3+ reading already stands, but a negative one does not
-        draft.grade = .plus3
-        #expect(draft.isGradeConfirmed)
+        s.chooseGrade(.plus3)
+        #expect(s.isGradeConfirmed)
 
-        draft.grade = .negative
-        #expect(!draft.isGradeConfirmed)
-        #expect(draft.fieldsRemainingForGrade == 70)
+        s.chooseGrade(.negative)
+        #expect(!s.isGradeConfirmed)
+        #expect(s.fieldsRemainingForGrade == 70)
     }
 }

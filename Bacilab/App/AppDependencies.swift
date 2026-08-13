@@ -7,16 +7,12 @@ final class AppDependencies {
     let analysisService: any AnalysisServiceProtocol
     let sessionStore: any SessionStoreProtocol
 
-    /// Masih dipakai layar lama selama migrasi; dihapus di task terakhir.
-    let sampleRepository: any SampleRepositoryProtocol
-
     init() {
         cameraService = CameraService()
         // Semua model membaca setiap lapang. ResNet yang hitungannya dipakai; dua YOLO ikut
         // tersimpan untuk dibandingkan, dan tidak pernah menjadi angka yang dipakai.
         analysisService = MultiDetectorService()
         sessionStore = SessionStore()
-        sampleRepository = SampleRepository()
     }
 
     /// Satu antrean per sesi.
