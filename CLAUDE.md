@@ -1,23 +1,23 @@
 # Bacilab (ElectraLab) — Claude Code Instructions
 
 ## Project Overview
-iOS app for BTA (Bakteri Tahan Asam / Acid-Fast Bacilli) microscope slide analysis at **Klinik Bunda**. The app guides a lab technician through a 4-screen flow: patient data entry → camera capture → manual BTA review → result/interpretation.
+iOS app for BTA (Bakteri Tahan Asam / Acid-Fast Bacilli) microscope slide analysis at **Electra Lab**. The app guides a lab technician through: patient data → scan session (20 fields per batch) → per-field review → published result sheet. Every clinical decision — per-field count, grade, notes, publish — belongs to the review screen alone.
 
 ## Architecture
 - **Language**: Swift, SwiftUI, iOS 17+
 - **Pattern**: MVVM with explicit dependency injection (no Singletons)
-- **State**: `@Observable` macro for ViewModels and `SampleDraft`; `@Bindable` to pass mutable observable objects through views
+- **State**: `@Observable` macro for ViewModels and `ExamSession`; `@Bindable` to pass mutable observable objects through views
 - **Navigation**: `NavigationStack` + `navigationDestination` inside a `.sheet`
 - **DI container**: `AppDependencies` — created once in `ElectraLabApp`, passed explicitly (not via environment) through the navigation chain
 
 ## Critical Rules
 
 ### Dependency Injection — DO NOT use `@Environment(AppDependencies.self)`
-Views inside the sheet's `NavigationStack` (DataInput → Capture → Analysis → Result) must receive dependencies via **explicit `let` properties**, not `@Environment`. Using `@Environment(AppDependencies.self)` inside a pushed view will crash at runtime.
+Views inside the sheet's `NavigationStack` (PatientData → Scan → Review → ResultSheet) must receive dependencies via **explicit `let` properties**, not `@Environment`. Using `@Environment(AppDependencies.self)` inside a pushed view will crash at runtime.
 
 Correct pattern:
 ```swift
-struct CaptureView: View {
+struct ScanView: View {
     let dependencies: AppDependencies
     // ...
 }
@@ -25,17 +25,31 @@ struct CaptureView: View {
 
 `@Environment` is only safe at the root (`SampleListView`), which is directly under the `.environment(dependencies)` modifier.
 
-### SampleDraft — shared mutable state across the 4-screen flow
-`SampleDraft` is an `@Observable` class created once per session and passed by reference via `@Bindable`. All screens mutate the same instance. Never create a new `SampleDraft` mid-flow.
+### ExamSession — one source of truth, no stored counts
+`ExamSession` is `@Observable`, created once per examination and passed by reference. **No count
+is stored.** `totalBTA` and `examinedFieldCount` are recomputed from `fields` on every read, so
+the count that drives the grade cannot drift from the fields it came from. The old model kept
+`manualBTACount` beside the field list; the two could disagree, and the stored one is what
+reached the patient's report.
+
+`chosenGrade` is optional: `nil` means nobody has decided yet, so `reportedGrade` falls back to
+`suggestedGrade`. That optional replaces the old `hasManualGrade` flag.
 
 ### Simulator safety
-All camera code must be guarded with `#if targetEnvironment(simulator)`. `CaptureView` shows a
+All camera code must be guarded with `#if targetEnvironment(simulator)`. `ScanView` shows a
 decorative radial gradient test pattern on simulator.
 
 `CameraService.captureImage()` renders a **synthetic stained field** on simulator (seeded, so the
 count is stable) rather than returning empty data. This is what lets the capture → detection path
 be tested without hardware; it is compiled out of device builds, so a real slide never meets it.
 Returning `Data()` here would make `analyze` be skipped and every field silently score 0.
+
+### Sessions live on disk
+`SessionStore` writes one directory per session under Application Support: `manifest.json` plus
+`field-NNN.jpg` at analysis resolution (max side 1600 — the model's own `max_size`). The manifest
+is rewritten after every recorded or analysed field, so a session survives the app being killed.
+`FieldRecord.imageFileName` is relative, never an absolute URL: iOS container paths change
+between installs.
 
 ### Grading is gated by field count — WHO/IUATLD
 `BTAGrade.minimumFields`: 3+ needs 20 fields, 2+ needs 50, and 1+/Scanty/**Negatif need the full
@@ -53,11 +67,21 @@ already discards everything below 0.70 — so it cannot read lower than 70% no m
 the field is. It says how sure the model is about the bacilli **it kept**, not how confident
 anyone should be in the count. Do not present it as the latter.
 
-### A capture that fails must not count as a field
-`capturedFieldCount` increments only on the success path. Counting a failed capture inflates the
-denominator in `BTAGrade.grade(for:across:)` and drags the grade down. Likewise, once the analyst
-picks a grade by hand (`SampleDraft.selectGrade`), `hasManualGrade` stops further captures from
-overwriting that judgement.
+Review menampilkannya sebagai "Model yakin N% atas basil yang ia tandai", bukan sebagai angka
+keyakinan hasil. Grafik ONNX membuang deteksi di bawah 0,70, jadi angka itu tidak pernah bisa
+terbaca di bawah 70%.
+
+### Every scanned field counts — including empty ones
+`ScanViewModel.captureField` appends a field whenever the image is written to disk, whether or
+not any bacilli are found. Auto-scan used to increment only when `btaCount > 0`, so empty fields
+never entered the denominator and **grade Negatif was structurally unreachable**.
+
+A capture that fails still appends nothing: the field is recorded only after its image is safely
+on disk, so a full disk cannot leave a field whose picture does not exist.
+
+Because every frame counts, a stationary slide is counted repeatedly. The per-100 ratio survives
+that (BTA and fields rise together), but `examinedFieldCount` can reach a threshold without that
+many distinct fields being seen. Review's **delete-field** is what corrects it.
 
 ## File Structure
 ```
@@ -72,73 +96,84 @@ Bacilab/Bacilab/
 │   │   └── Skeleton.swift         # SkeletonLine, SkeletonBlock, SkeletonCircle, SkeletonPill + .skeletonShimmer()
 │   ├── Domain/
 │   │   ├── Entities/
-│   │   │   ├── Sample.swift       # Final saved struct; Sample.build(from: draft)
-│   │   │   ├── SampleDraft.swift  # Mutable @Observable class for the capture flow
+│   │   │   ├── ExamSession.swift    # @Observable session; derives totalBTA/examinedFieldCount, never stores them
+│   │   │   ├── FieldRecord.swift    # One scanned field: image ref, per-model readings, manual correction
+│   │   │   ├── PatientInfo.swift    # Patient data captured before scanning
 │   │   │   └── AnalysisResult.swift # BTAGrade with IUATLD grading logic
-│   │   └── Protocols/             # CameraServiceProtocol, AnalysisServiceProtocol, SampleRepositoryProtocol
+│   │   └── Protocols/             # CameraServiceProtocol, AnalysisServiceProtocol, SessionStoreProtocol
 │   ├── Services/
-│   │   ├── CameraService.swift    # AVCaptureSession + AVCapturePhotoOutput, simulator-safe
-│   │   ├── VisionAnalysisService.swift  # CoreML + hand-written YOLO-OBB decoding
-│   │   └── SampleRepository.swift # In-memory store
+│   │   ├── CameraService.swift         # AVCaptureSession + AVCapturePhotoOutput, simulator-safe
+│   │   ├── FieldFraming.swift          # Byte-identical crop shared by all three detectors
+│   │   ├── ResNetAnalysisService.swift # BTADetector.onnx via ONNX Runtime — grading model
+│   │   ├── YOLOAnalysisService.swift   # BTADetector.mlmodelc (YOLOv8s-OBB) — comparison only
+│   │   ├── YOLO11AnalysisService.swift # YOLO11 CoreML — comparison only
+│   │   ├── MultiDetectorService.swift  # Runs all three detectors concurrently over identical bytes
+│   │   ├── SessionStore.swift          # Reads/writes ExamSession + field images under Application Support
+│   │   ├── FieldAnalysisQueue.swift    # Serial background analysis while scanning continues
+│   │   ├── FocusMetric.swift           # Sharpness/blur warning, never blocks capture
+│   │   └── Diagnostics.swift           # os.Logger + stderr logging for device debugging
 │   └── Extensions/
-│       └── PreviewHelpers.swift   # Sample.previews, SampleDraft.preview
+│       └── PreviewHelpers.swift   # ExamSession.previewHeavy / .previewNegative / .previewRunning
 ├── Resources/
 │   └── BTADetector.onnx           # bundled detector, run via ONNX Runtime (79 MB)
 └── Features/
-    ├── SampleList/  # Home screen — list + FAB to open new-sample sheet
-    ├── DataInput/   # Patient data form → NavigationLink to Capture
-    ├── Capture/     # Camera + BTA AI detection per field
-    ├── Analysis/    # Manual BTA count review + grade selection
-    └── Result/      # Final interpretation + save
+    ├── SampleList/   # Home screen — history of sessions; FAB starts a new one
+    ├── PatientData/  # Patient data form → NavigationLink to Scan
+    ├── Scan/         # Scan session, 20 fields/batch, blind to BTA (+ Components/CameraPreviewView.swift)
+    ├── Review/       # Per-field count, grade, notes, delete-field, publish — the only screen that decides
+    │                 #   (+ Components/: DetectorStyle, FieldCanvas, FieldPager, CountKeypad)
+    └── ResultSheet/  # Read-only published result; also reached by tapping a sample in history
 ```
 
-## Two detectors, compared on the same field
-Both models ship and both read every field when the analyst picks "Keduanya":
+## Three detectors, compared on the same field
+Every field is read by all three models; only one of them ever grades:
 
 | | |
 |---|---|
-| `ResNetAnalysisService` | `BTADetector.onnx`, Faster R-CNN, ONNX Runtime. Default grading model. |
-| `YOLOAnalysisService` | `BTADetector.mlmodelc`, YOLOv8s-OBB, CoreML. The previous detector. |
-| `DualDetectorService` | Runs the selection, concurrently, over identical bytes. |
+| `ResNetAnalysisService` | `BTADetector.onnx`, Faster R-CNN, ONNX Runtime. The grading model. |
+| `YOLOAnalysisService` | `BTADetector.mlmodelc`, YOLOv8s-OBB, CoreML. Comparison only. |
+| `YOLO11AnalysisService` | YOLO11 end-to-end, CoreML. Comparison only. |
+| `MultiDetectorService` | Runs all three concurrently, over identical bytes. |
 
-`FieldFraming` exists so both get **byte-identical** input. Duplicate the crop into either
+`FieldFraming` exists so all three get **byte-identical** input. Duplicate the crop into any
 service and any difference in counts becomes part framing and part model, inseparably.
 
-**The grade follows `selection.gradingDetector` and nothing else.** Averaging two models
-produces a count neither one made. Choosing `.yolo` really does hand the grade to YOLO — its
-`conf 0.25` was never clinically calibrated, so the UI must always name the model on screen.
+**ResNet is unconditionally the grading detector — `FieldAnalysisQueue` hardcodes it.** There is
+no analyst picker any more: `DetectorSelection` / `gradingDetector` still exist inside
+`MultiDetectorService`, but every field is analysed with `.all` and `primary: .resnet`. YOLO and
+YOLO11 ride along only to be shown beside ResNet's count in Review — averaging the three would
+produce a count none of them made, so neither ever becomes the number of record.
 
-### Counts are filed per model — never one accumulator relabelled
-`SampleDraft.detectorCounts` / `detectorFields` are keyed by `DetectorKind`. There used to be
-a single `manualBTACount` paired with a `comparisonBTACount`, and which model each belonged to
-depended on what was selected when the column was drawn. Switching from "Keduanya" to YOLO
-relabelled ResNet's accumulated fields as YOLO's: the heading changed, the number did not —
-and that number drives the grade and is what `Sample.build` saves.
-
-`reconcileCountSource(with:)` re-points the count of record when the model changes, dropping
-manual +/- adjustments on purpose: they were made against a different model's reading of
-different fields. It lives on `SampleDraft`, **not** in a view's `onChange` — it is an
-invariant of the data, and wired to a view it only holds while that screen is on display.
+### Every field's readings are stored once, on that field — nothing left to relabel
+`FieldRecord.analysis` (a `FieldAnalysis`) is set once by `FieldAnalysisQueue` and carries all
+three `DetectorReading`s plus the frozen `primary` detector for that field. There is no
+session-wide accumulator keyed by model that could drift: the old model kept a single
+`manualBTACount` beside a `comparisonBTACount`, and which model each belonged to depended on
+what was selected when the column was drawn — switching models relabelled one detector's
+accumulated fields as another's without changing the number underneath. That accumulator, and
+the `reconcileCountSource(with:)` that patched around it, do not exist any more; each field's
+own readings can't be reassigned to a different model after the fact.
 
 ### The overlay must draw on the frame that was analysed
-`CaptureViewModel.analyzedImage` freezes the centred square the models received, and the
-viewfinder shows it instead of the live feed until `resumeLivePreview()`. Boxes are normalised
-against those pixels; over a live preview they sit on bacilli that have already moved.
+`FieldCanvas` draws over the field's own stored image (`ReviewViewModel.imageData(for:)`, read
+back from `SessionStore`), never a live preview — boxes are normalised against the exact pixels
+`FieldFraming` handed the models, so a box still sits on the same bacillus whether reviewed
+seconds or hours after capture.
 
-Boxes from both models are flattened into one `ForEach` with ids like `"YOLO-3"`. Both models
-number their boxes from 0, so a nested `ForEach` per reading lets the inner ids collide.
+Boxes from all three models are flattened into one `ForEach`, with ids like `"ResNet-0"`,
+`"YOLOv8-3"`, `"YOLO11-2"` (`FieldCanvas.Marker.id`). Every model numbers its own boxes from 0,
+so a nested `ForEach` per reading would let the inner ids collide.
 
-The preview is a **square, not a circle**: `resizeAspectFill` means that square is exactly
-`FieldFraming`'s crop, so everything shown is analysed and everything analysed is shown. The
-old circular mask hid ~21% of the analysed area — bacilli could be counted where the analyst
-could not see them.
+The canvas is a **square, with a dashed circle drawn on top only as an eyepiece guide — never a
+mask**: the square is exactly `FieldFraming`'s crop, so everything shown is analysed and
+everything analysed is shown. A circular *mask* would hide ~21% of the analysed area — bacilli
+could be counted where the analyst cannot see them; the dashed circle here is decoration, not a
+clip.
 
 ### Diagnosing a device-only detection bug
 `Diag` logs to `os.Logger` **and** stderr in Debug, because `devicectl … --console` relays only
 stdout/stderr — instrumentation written with `Logger` alone produces a silent console and reads
-as "the code never ran". The comparison columns also carry a `#if DEBUG` line showing
-`N kotak · T s` per model, which separates "the model found nothing" from "the drawing is
-broken"; those look identical on screen. `log collect` from a device needs root.
+as "the code never ran". `log collect` from a device needs root.
 
 ## AI Model Integration
 The model is **bundled and active** at `Bacilab/Resources/BTADetector.onnx` (79 MB), run
@@ -193,7 +228,7 @@ the point: they are what proves no constant got baked in.
 Fold 4's own validation split: AP50 0.835, precision 0.79, recall 0.76, count MAE 1.32. It is
 the **best of the five folds**, and picking the best fold by validation metrics is optimistic.
 The 5-fold mean is AP50 0.72 / count MAE 1.81, which is the more honest expectation. None of
-it has been checked against slides read at Klinik Bunda.
+it has been checked against slides read at Electra Lab.
 
 ### Device-only concerns
 Roughly 0.6 s per field on an M5 CPU, so expect a few seconds on device — `analyze` runs on a
