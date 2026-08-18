@@ -107,9 +107,7 @@ struct ReviewView: View {
             HStack {
                 Spacer()
                 FieldCanvas(
-                    image: viewModel.selectedField.flatMap { field in
-                        viewModel.imageData(for: field).flatMap(UIImage.init(data:))
-                    },
+                    image: viewModel.selectedField.flatMap { viewModel.image(for: $0) },
                     readings: viewModel.selectedField?.analysis?.readings ?? [],
                     side: side
                 )

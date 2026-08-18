@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UIKit
 
 private let reviewLog = Diag("review")
 
@@ -190,6 +191,29 @@ final class ReviewViewModel {
 
     func imageData(for field: FieldRecord) -> Data? {
         try? Data(contentsOf: store.fieldImageURL(fileName: field.imageFileName, for: session))
+    }
+
+    /// One decoded field image, held so the view body does not re-read and re-decode it.
+    ///
+    /// Only the selected field is ever drawn, so a single entry is enough — caching all 20
+    /// would hold roughly 200 MB of decoded bitmaps.
+    private var cachedImage: (fieldID: UUID, image: UIImage)?
+
+    /// The selected field's image, decoded at most once per field.
+    ///
+    /// `ExamSession` is `@Observable` and mutates once per analysed field, and `queue.remaining`
+    /// changes alongside it — so during a 20-field run SwiftUI re-evaluates this screen dozens of
+    /// times. Decoding a 1600×1600 JPEG from disk inside the body on each of those passes stalls
+    /// the main thread and churns memory hard enough to take the app down mid-progress.
+    func image(for field: FieldRecord) -> UIImage? {
+        if let cachedImage, cachedImage.fieldID == field.id {
+            return cachedImage.image
+        }
+        guard let data = imageData(for: field), let image = UIImage(data: data) else {
+            return nil
+        }
+        cachedImage = (field.id, image)
+        return image
     }
 
     // MARK: - Simpan
