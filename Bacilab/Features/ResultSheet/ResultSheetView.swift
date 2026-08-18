@@ -9,6 +9,8 @@ struct ResultSheetView: View {
     let session: ExamSession
     let dependencies: AppDependencies
 
+    @State private var isGradeExpanded = false
+
     private var grade: BTAGrade { session.reportedGrade }
 
     private var gradeColor: Color {
@@ -103,6 +105,56 @@ struct ResultSheetView: View {
 
     // MARK: - Hasil
 
+    /// How the grade was arrived at, shown when the grade row is tapped.
+    ///
+    /// A grade is an **extrapolation**: the bacilli counted across the fields actually read,
+    /// scaled to 100 fields, landing in a band. "2+" does not mean two of anything. Without this
+    /// the reader has to take the letter on trust, and the one number that matters clinically is
+    /// the one they cannot check.
+    @ViewBuilder
+    private var gradeDerivation: some View {
+        let fields = max(session.examinedFieldCount, 1)
+        let per100 = Double(session.totalBTA) / Double(fields) * 100
+
+        VStack(alignment: .leading, spacing: 6) {
+            Divider().overlay(.white.opacity(0.35))
+
+            derivationRow("Counted",
+                          "\(session.totalBTA) BTA across \(session.examinedFieldCount) fields read")
+            derivationRow("Extrapolated", String(format: "%.0f BTA per 100 fields", per100))
+            derivationRow("Band", "\(grade.rawValue) — \(gradeDescription)")
+            derivationRow("Fields required",
+                          session.isGradeConfirmed
+                          ? "\(grade.minimumFields) (WHO/IUATLD) — met"
+                          : "\(grade.minimumFields) (WHO/IUATLD) — \(session.fieldsRemainingForGrade) short")
+
+            // The comparison model never contributes to this number, and a reader has no other
+            // way to know which of the two produced it.
+            derivationRow("Counted by", "ResNet. YOLO11 read the same fields for comparison only.")
+
+            // A slide read partly through the eyepiece and partly from imported photos is two
+            // acquisitions pooled into one grade. Silent about it, this sheet would imply one.
+            if session.importedFieldCount > 0 {
+                derivationRow("Imported fields",
+                              "\(session.importedFieldCount) of \(session.examinedFieldCount) came from photos, not the eyepiece")
+            }
+        }
+        .padding(.top, 2)
+    }
+
+    private func derivationRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .frame(width: 108, alignment: .leading)
+                .opacity(0.75)
+            Text(value)
+                .font(.caption2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
     private var resultSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Result")
@@ -114,25 +166,36 @@ struct ResultSheetView: View {
                 .foregroundStyle(.orange)
 
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 10) {
-                    Image(systemName: grade == .negative
-                          ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-                        .font(.title2)
-                    Text(gradeLabel)
-                        .font(.system(.title2, design: .rounded, weight: .black))
-                    Spacer()
-                    if !session.isGradeConfirmed {
-                        Text("PROVISIONAL")
-                            .font(.system(size: 10, weight: .heavy, design: .rounded))
-                            .padding(.horizontal, 7)
-                            .padding(.vertical, 3)
-                            .background(.white.opacity(0.25), in: Capsule())
+                Button {
+                    withAnimation(.snappy(duration: 0.22)) { isGradeExpanded.toggle() }
+                } label: {
+                    HStack(spacing: 10) {
+                        Image(systemName: grade == .negative
+                              ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
+                            .font(.title2)
+                        Text(gradeLabel)
+                            .font(.system(.title2, design: .rounded, weight: .black))
+                        Spacer()
+                        if !session.isGradeConfirmed {
+                            Text("PROVISIONAL")
+                                .font(.system(size: 10, weight: .heavy, design: .rounded))
+                                .padding(.horizontal, 7)
+                                .padding(.vertical, 3)
+                                .background(.white.opacity(0.25), in: Capsule())
+                        }
+                        Image(systemName: "chevron.down")
+                            .font(.subheadline.weight(.semibold))
+                            .rotationEffect(.degrees(isGradeExpanded ? 180 : 0))
                     }
                 }
+                .foregroundStyle(.white)
+
                 Text(gradeDescription)
                     .font(.caption)
                     .opacity(0.85)
                     .fixedSize(horizontal: false, vertical: true)
+
+                if isGradeExpanded { gradeDerivation }
             }
             .foregroundStyle(.white)
             .padding(16)
@@ -141,8 +204,8 @@ struct ResultSheetView: View {
 
             if !session.isGradeConfirmed {
                 Label(
-                    "Baru \(session.examinedFieldCount) lapang terbaca. \(grade.rawValue) memerlukan "
-                    + "\(grade.minimumFields) lapang (WHO/IUATLD), jadi hasil ini belum final.",
+                    "Only \(session.examinedFieldCount) fields read. \(grade.rawValue) requires "
+                    + "\(grade.minimumFields) fields (WHO/IUATLD), so this result is not final.",
                     systemImage: "exclamationmark.circle.fill"
                 )
                 .font(.caption)
