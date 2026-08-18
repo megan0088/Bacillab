@@ -28,32 +28,10 @@ final class SessionStore: SessionStoreProtocol {
 
     // MARK: - Bentuk tersimpan
 
-    /// `ExamSession` adalah kelas `@Observable`, jadi ia tidak bisa langsung `Codable`.
-    /// Snapshot ini yang ditulis; ia juga menjadi batas eksplisit antara bentuk di memori
-    /// dan bentuk di disk.
-    private struct Snapshot: Codable {
-        let id: UUID
-        let createdAt: Date
-        let patient: PatientInfo
-        let notes: String
-        let status: SessionStatus
-        let chosenGrade: BTAGrade?
-        let fields: [FieldRecord]
-    }
-
-    private func snapshot(_ session: ExamSession) -> Snapshot {
-        Snapshot(
-            id: session.id,
-            createdAt: session.createdAt,
-            patient: session.patient,
-            notes: session.notes,
-            status: session.status,
-            chosenGrade: session.chosenGrade,
-            fields: session.fields
-        )
-    }
-
-    private func session(from snapshot: Snapshot) -> ExamSession {
+    /// The on-disk shape is `SessionSnapshot` (declared beside `ExamSession`): a `Sendable` value
+    /// the caller freezes on its own actor, so this store never reads a live session's `fields`
+    /// off the main actor while the scan loop or the analysis queue is appending to it.
+    private func session(from snapshot: SessionSnapshot) -> ExamSession {
         ExamSession(
             id: snapshot.id,
             patient: snapshot.patient,
@@ -67,12 +45,12 @@ final class SessionStore: SessionStoreProtocol {
 
     // MARK: - Lokasi
 
-    private func directory(for session: ExamSession) -> URL {
-        root.appendingPathComponent(session.id.uuidString, isDirectory: true)
+    private func directory(forID id: UUID) -> URL {
+        root.appendingPathComponent(id.uuidString, isDirectory: true)
     }
 
-    private func manifestURL(for session: ExamSession) -> URL {
-        directory(for: session).appendingPathComponent("manifest.json")
+    private func directory(for session: ExamSession) -> URL {
+        directory(forID: session.id)
     }
 
     func fieldImageURL(fileName: String, for session: ExamSession) -> URL {
@@ -81,18 +59,18 @@ final class SessionStore: SessionStoreProtocol {
 
     // MARK: - SessionStoreProtocol
 
-    func save(_ session: ExamSession) async throws {
-        let dir = directory(for: session)
+    func save(_ snapshot: SessionSnapshot) async throws {
+        let dir = directory(forID: snapshot.id)
         try fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        let data = try encoder.encode(snapshot(session))
+        let data = try encoder.encode(snapshot)
 
         // Tulis atomik: app yang mati di tengah penulisan tidak boleh meninggalkan manifest
         // separuh jadi, karena itu akan menghapus seluruh sesi saat dibaca kembali.
-        try data.write(to: manifestURL(for: session), options: .atomic)
+        try data.write(to: dir.appendingPathComponent("manifest.json"), options: .atomic)
     }
 
     func writeFieldImage(_ data: Data, fileName: String, for session: ExamSession) throws {
@@ -122,7 +100,7 @@ final class SessionStore: SessionStoreProtocol {
         let sessions: [ExamSession] = dirs.compactMap { dir in
             let manifest = dir.appendingPathComponent("manifest.json")
             guard let data = try? Data(contentsOf: manifest),
-                  let snapshot = try? decoder.decode(Snapshot.self, from: data)
+                  let snapshot = try? decoder.decode(SessionSnapshot.self, from: data)
             else {
                 // Satu manifest rusak tidak boleh menyembunyikan sesi lain. Dilewati diam-diam
                 // di sini; direktorinya tetap ada untuk diperiksa.

@@ -169,13 +169,26 @@ struct SampleListView: View {
         guard session.status == .published else {
             return ("In progress", .orange)
         }
+
+        let name: String
+        let color: Color
         switch session.reportedGrade {
-        case .negative: return ("Negative", .green)
-        case .scanty:   return ("Scanty", .orange)
-        case .plus1:    return ("Positive 1+", .red)
-        case .plus2:    return ("Positive 2+", .red)
-        case .plus3:    return ("Positive 3+", .red)
+        case .negative: (name, color) = ("Negative", .green)
+        case .scanty:   (name, color) = ("Scanty", .orange)
+        case .plus1:    (name, color) = ("Positive 1+", .red)
+        case .plus2:    (name, color) = ("Positive 2+", .red)
+        case .plus3:    (name, color) = ("Positive 3+", .red)
         }
+
+        // Below the WHO/IUATLD field minimum this grade is not a conclusion. The list is where
+        // someone scans to see what a slide said, so it must not read as final while the result
+        // sheet stamps PROVISIONAL on the same session. The sharpest case is a session whose
+        // fields all failed analysis: zero fields read, `suggestedGrade` falls back to Negative,
+        // and without this it would show a plain green "Negative" having read nothing at all.
+        guard session.isGradeConfirmed else {
+            return ("\(name) · Provisional", .orange)
+        }
+        return (name, color)
     }
 
     private func row(for session: ExamSession) -> some View {

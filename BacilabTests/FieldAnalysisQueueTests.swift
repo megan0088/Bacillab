@@ -50,17 +50,17 @@ struct FieldAnalysisQueueTests {
     /// sungguh sampai ke disk — bukan hanya bertahan di `ExamSession` yang ada di memori.
     private final class SpyStore: SessionStoreProtocol, @unchecked Sendable {
         private let lock = NSLock()
-        private var _savedSessions: [ExamSession] = []
+        private var _savedSnapshots: [SessionSnapshot] = []
 
-        var savedSessions: [ExamSession] {
+        var savedSnapshots: [SessionSnapshot] {
             lock.lock(); defer { lock.unlock() }
-            return _savedSessions
+            return _savedSnapshots
         }
 
         func allSessions() async throws -> [ExamSession] { [] }
-        func save(_ session: ExamSession) async throws {
+        func save(_ snapshot: SessionSnapshot) async throws {
             lock.lock()
-            _savedSessions.append(session)
+            _savedSnapshots.append(snapshot)
             lock.unlock()
         }
         func delete(_ session: ExamSession) async throws {}
@@ -216,7 +216,7 @@ struct FieldAnalysisQueueTests {
     }
 
     @Test("Sesi tersimpan ke disk setelah satu lapang selesai dianalisis")
-    func sessionIsPersistedAfterFieldAnalysis() async {
+    func sessionIsPersistedAfterFieldAnalysis() async throws {
         let service = StubAnalysisService()
         service.countPerField = 6
         let store = SpyStore()
@@ -233,11 +233,16 @@ struct FieldAnalysisQueueTests {
         // `ReviewViewModelTests` untuk kasus fire-and-forget yang serupa.
         try? await Task.sleep(for: .milliseconds(20))
 
-        #expect(!store.savedSessions.isEmpty,
+        #expect(!store.savedSnapshots.isEmpty,
                 "Sesi harus tersimpan setelah lapang selesai dianalisis, bukan cuma tinggal di memori")
-        let saved = store.savedSessions.last
-        #expect(saved?.field(withID: field.id)?.analysis != nil,
-                "Simpanan harus membawa hasil analisis lapang ini")
-        #expect(saved?.totalBTA == 6)
+
+        // Diperiksa lewat snapshot, bukan lewat objek sesi. Sebelumnya spy menyimpan referensi
+        // `ExamSession`, jadi asersi ini membaca objek yang masih hidup — ia akan lulus bahkan
+        // seandainya `save` tidak menulis apa pun. Snapshot adalah salinan pada saat penyimpanan,
+        // jadi sekarang ia benar-benar membuktikan apa yang dikirim ke penyimpanan.
+        let saved = try #require(store.savedSnapshots.last)
+        let savedField = try #require(saved.fields.first { $0.id == field.id })
+        #expect(savedField.analysis != nil, "Simpanan harus membawa hasil analisis lapang ini")
+        #expect(savedField.effectiveCount == 6)
     }
 }

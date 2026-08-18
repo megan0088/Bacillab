@@ -17,8 +17,14 @@ struct FieldAnalysis: Codable, Hashable, Sendable {
         return r.btaCount
     }
 
+    /// Nil when the model marked nothing.
+    ///
+    /// A detector that found no bacilli reports `confidence: 0`, and rendering that as
+    /// "0% confident" beside an empty field states doubt where the truth is absence — there was
+    /// nothing to be confident about. On a clean slide that would be most fields, and a
+    /// fabricated figure next to a count is exactly what must never appear.
     var confidence: Double? {
-        guard let r = primaryReading, r.failure == nil else { return nil }
+        guard let r = primaryReading, r.failure == nil, r.btaCount > 0 else { return nil }
         return r.confidence
     }
 }

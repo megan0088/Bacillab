@@ -12,7 +12,7 @@ struct ReviewViewModelTests {
         var savedCount = 0
         var saveError: Error?
         func allSessions() async throws -> [ExamSession] { [] }
-        func save(_ session: ExamSession) async throws {
+        func save(_ snapshot: SessionSnapshot) async throws {
             if let saveError { throw saveError }
             savedCount += 1
         }

@@ -49,7 +49,7 @@ struct ScanViewModelTests {
             .appendingPathComponent("ScanViewModelTests-\(UUID().uuidString)")
 
         func allSessions() async throws -> [ExamSession] { [] }
-        func save(_ session: ExamSession) async throws {
+        func save(_ snapshot: SessionSnapshot) async throws {
             if let saveError { throw saveError }
             savedCount += 1
         }
@@ -248,6 +248,38 @@ struct ScanViewModelTests {
 
         #expect(session.fields.count == ExamSession.batchTarget,
                 "Loop harus berhenti tepat di batchTarget, bukan lebih atau kurang")
+        #expect(vm.isScanning == false)
+    }
+
+    /// `batchTarget` adalah seberapa banyak satu tekan menambah, bukan plafon sesi.
+    ///
+    /// Sebelumnya kondisi loop membandingkan langsung ke `batchTarget`, jadi begitu sesi punya
+    /// 20 lapang tombol scan tidak melakukan apa pun — diam, tanpa pesan. Akibatnya 2+ (50
+    /// lapang) dan 1+/Scanty/Negatif (100 lapang) **tidak akan pernah bisa final**, dan tombol
+    /// "Continue Scanning" di Review mengembalikan analis ke layar mati itu.
+    @Test("Tekan kedua menambah satu batch lagi, bukan berhenti di plafon")
+    func secondPressAddsAnotherBatch() async {
+        let store = SpyStore()
+        let vm = makeViewModel(camera: StubCamera(payload: jpegBytes()), store: store)
+        vm.scanIntervalMilliseconds = 1
+        let session = ExamSession()
+
+        func scanOneBatch() async {
+            vm.toggleScan(session: session)
+            var waited = 0
+            while vm.isScanning, waited < 5000 {
+                try? await Task.sleep(for: .milliseconds(25))
+                waited += 25
+            }
+        }
+
+        await scanOneBatch()
+        #expect(session.fields.count == ExamSession.batchTarget)
+
+        await scanOneBatch()
+
+        #expect(session.fields.count == ExamSession.batchTarget * 2,
+                "Tekan kedua harus menambah satu batch penuh; kalau tetap 20, gerbang WHO untuk 2+, 1+, Scanty dan Negatif tidak akan pernah bisa dipenuhi")
         #expect(vm.isScanning == false)
     }
 

@@ -35,7 +35,7 @@ struct SessionStoreTests {
         let field = session.appendField(imageFileName: "field-000.jpg")
         session.setAnalysis(analysis(6), for: field.id)
 
-        try await store.save(session)
+        try await store.save(session.snapshot())
         let loaded = try await store.allSessions()
 
         let restored = try #require(loaded.first { $0.id == session.id })
@@ -60,7 +60,7 @@ struct SessionStoreTests {
         session.setCorrectedCount(2, for: a.id)
         session.setExcluded(true, for: b.id)
 
-        try await store.save(session)
+        try await store.save(session.snapshot())
         let restored = try #require(try await store.allSessions().first { $0.id == session.id })
 
         #expect(restored.totalBTA == 2)
@@ -76,7 +76,7 @@ struct SessionStoreTests {
         session.chooseGrade(.scanty)
         session.status = .published
 
-        try await store.save(session)
+        try await store.save(session.snapshot())
         let restored = try #require(try await store.allSessions().first { $0.id == session.id })
 
         #expect(restored.chosenGrade == .scanty)
@@ -90,9 +90,9 @@ struct SessionStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let session = ExamSession()
-        try await store.save(session)
+        try await store.save(session.snapshot())
         session.notes = "diperbarui"
-        try await store.save(session)
+        try await store.save(session.snapshot())
 
         let loaded = try await store.allSessions()
         #expect(loaded.count == 1)
@@ -105,7 +105,7 @@ struct SessionStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let session = ExamSession()
-        try await store.save(session)
+        try await store.save(session.snapshot())
         let bytes = Data([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0x10])
 
         try store.writeFieldImage(bytes, fileName: "field-000.jpg", for: session)
@@ -120,7 +120,7 @@ struct SessionStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let session = ExamSession()
-        try await store.save(session)
+        try await store.save(session.snapshot())
         try store.writeFieldImage(Data([0x01]), fileName: "field-000.jpg", for: session)
         let url = store.fieldImageURL(fileName: "field-000.jpg", for: session)
 
@@ -138,8 +138,8 @@ struct SessionStoreTests {
 
         let older = ExamSession(createdAt: Date(timeIntervalSince1970: 1_000_000))
         let newer = ExamSession(createdAt: Date(timeIntervalSince1970: 2_000_000))
-        try await store.save(older)
-        try await store.save(newer)
+        try await store.save(older.snapshot())
+        try await store.save(newer.snapshot())
 
         let loaded = try await store.allSessions()
         #expect(loaded.first?.id == newer.id)
@@ -151,7 +151,7 @@ struct SessionStoreTests {
         defer { try? FileManager.default.removeItem(at: root) }
 
         let good = ExamSession()
-        try await store.save(good)
+        try await store.save(good.snapshot())
 
         let brokenDir = root.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: brokenDir, withIntermediateDirectories: true)

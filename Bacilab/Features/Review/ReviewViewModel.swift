@@ -137,11 +137,19 @@ final class ReviewViewModel {
         isPublishing = true
         defer { isPublishing = false }
 
+        // Freeze the reading before recording it. Publishing is offered even while fields are
+        // still queued — that is what the "Publish Anyway" dialog exists for — and without this
+        // those fields land afterwards, moving the total, the denominator and, when no grade was
+        // chosen by hand, the grade itself, all while the analyst is looking at the published
+        // sheet. Nothing would record that it changed. Discarded fields stay unanalysed and are
+        // picked up again by `analysePendingFields()` if the analyst returns to Review.
+        queue.cancelAll()
+
         let previousStatus = session.status
         session.status = .published
         do {
             errorMessage = nil
-            try await store.save(session)
+            try await store.save(session.snapshot())
             isPublished = true
         } catch {
             // Kembalikan statusnya: hasil yang gagal tersimpan tidak boleh tampak terbit.
@@ -162,8 +170,10 @@ final class ReviewViewModel {
     /// captures live. Without this those fields sit `pending` forever and quietly sit outside
     /// both the numerator and the denominator.
     ///
-    /// Safe to call repeatedly: a field stops being `isPending` the moment its analysis lands,
-    /// and the queue is per-session, so nothing is enqueued twice within one visit.
+    /// Safe to call repeatedly, and across visits: `FieldAnalysisQueue` refuses a field id it is
+    /// already holding. Relying on `isPending` alone would not be enough — a queue outlives one
+    /// visit to this screen, so leaving and returning would enqueue the same still-pending fields
+    /// a second time.
     func analysePendingFields() {
         let pending = session.fields.filter(\.isPending)
         guard !pending.isEmpty else { return }
@@ -191,7 +201,7 @@ final class ReviewViewModel {
             guard let self else { return }
             do {
                 self.errorMessage = nil
-                try await self.store.save(self.session)
+                try await self.store.save(self.session.snapshot())
             } catch {
                 self.errorMessage = error.localizedDescription
             }

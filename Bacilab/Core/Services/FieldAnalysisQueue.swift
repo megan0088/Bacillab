@@ -56,7 +56,16 @@ final class FieldAnalysisQueue {
         self.store = store
     }
 
+    /// Fields currently queued or in flight, so the same one is never analysed twice.
+    private var enqueuedIDs: Set<UUID> = []
+
     func enqueue(fieldID: UUID, imageData: Data, into session: ExamSession) {
+        // Review re-queues everything still pending each time it appears, and a queue outlives
+        // one visit — leaving Review and coming back would otherwise enqueue the same fields
+        // again. That costs N× the inference and pushes `remaining` past the number of fields,
+        // which renders as "Analysing -16 of 20 fields…".
+        guard enqueuedIDs.insert(fieldID).inserted else { return }
+
         jobs.append(Job(fieldID: fieldID, imageData: imageData, session: session))
         remaining = jobs.count
         startWorkerIfNeeded()
@@ -70,13 +79,22 @@ final class FieldAnalysisQueue {
         await worker?.value
     }
 
-    /// Menghentikan lapang yang belum sempat mulai dianalisis. Lapang yang sedang berjalan
-    /// saat ini dibiarkan selesai — hanya yang masih menunggu giliran yang dibuang.
+    /// Stops the queue and freezes the session against any further analysis.
+    ///
+    /// A field already mid-flight finishes computing — there is no way to interrupt the model —
+    /// but its result is **discarded** rather than written, because the generation it belongs to
+    /// is no longer current. That is what lets `publish()` freeze a reading: without it, a field
+    /// still in flight would land after the report was published and silently move the total,
+    /// the denominator, and the grade while the analyst was looking at the result sheet.
+    ///
+    /// A discarded field simply stays unanalysed; `ReviewViewModel.analysePendingFields()` picks
+    /// it up again on the next visit.
     func cancelAll() {
         generation += 1
         worker?.cancel()
         worker = nil
         jobs.removeAll()
+        enqueuedIDs.removeAll()
         remaining = 0
     }
 
@@ -97,9 +115,16 @@ final class FieldAnalysisQueue {
         // tanpa memprosesnya — lapang itu lenyap, bukan sekadar tertunda.
         while generation == myGeneration, !Task.isCancelled, let job = takeNextJob() {
             let analysis = await analyse(job)
-            job.session.setAnalysis(analysis, for: job.fieldID)
-            persist(job.session)
+
+            // Checked BEFORE writing, not after. `analyse` is the long await, so a `cancelAll()`
+            // — from publishing, or from the analyst stopping the scan — almost always lands
+            // during it. Writing first and checking afterwards would let a cancelled field
+            // mutate the session anyway, which is precisely the drift `publish()` must prevent.
             guard generation == myGeneration else { return }
+
+            job.session.setAnalysis(analysis, for: job.fieldID)
+            enqueuedIDs.remove(job.fieldID)
+            persist(job.session)
             remaining = jobs.count
         }
         guard generation == myGeneration else { return }
@@ -126,9 +151,13 @@ final class FieldAnalysisQueue {
     /// mewarisi `@MainActor` ini, jadi tulisan yang datang belakangan menggantikan yang lebih
     /// dulu, bukan merusaknya.
     private func persist(_ session: ExamSession) {
+        // Frozen here, on this actor, before the value is sent. Handing the live session to the
+        // store would let it read `fields` on the cooperative pool while the scan loop appends
+        // to it — a concurrent read/append that corrupts rather than merely miscounts.
+        let snapshot = session.snapshot()
         Task { [store] in
             do {
-                try await store.save(session)
+                try await store.save(snapshot)
             } catch {
                 queueLog.error("Simpan sesi setelah analisis gagal: \(error.localizedDescription)")
             }

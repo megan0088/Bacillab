@@ -9,7 +9,7 @@ struct SessionListViewModelTests {
         var sessions: [ExamSession] = []
         var deleted: [UUID] = []
         func allSessions() async throws -> [ExamSession] { sessions }
-        func save(_ session: ExamSession) async throws {}
+        func save(_ snapshot: SessionSnapshot) async throws {}
         func delete(_ session: ExamSession) async throws { deleted.append(session.id) }
         func writeFieldImage(_ data: Data, fileName: String, for session: ExamSession) throws {}
         func fieldImageURL(fileName: String, for session: ExamSession) -> URL {

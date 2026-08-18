@@ -61,7 +61,7 @@ enum DemoSeeder {
             return
         }
 
-        try await store.save(session)
+        try await store.save(session.snapshot())
         seedLog.note("Seeded a demo session with \(session.fields.count) fields, unanalysed")
     }
 

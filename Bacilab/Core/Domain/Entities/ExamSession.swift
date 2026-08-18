@@ -7,6 +7,24 @@ enum SessionStatus: String, Codable, Hashable, Sendable {
     case published
 }
 
+/// A session frozen into a value, for handing across an actor boundary.
+///
+/// `ExamSession` is an `@Observable` class mutated from the main actor by the scan loop, the
+/// analysis queue and the review screen. Passing it into a `nonisolated async` store meant the
+/// store read `fields` on the cooperative pool while those three could be appending to it — a
+/// concurrent read/append on a Swift array, which corrupts or crashes rather than merely
+/// producing a wrong number. Taking the snapshot on the caller's actor and sending this instead
+/// makes that unrepresentable.
+struct SessionSnapshot: Codable, Sendable {
+    let id: UUID
+    let createdAt: Date
+    let patient: PatientInfo
+    let notes: String
+    let status: SessionStatus
+    let chosenGrade: BTAGrade?
+    let fields: [FieldRecord]
+}
+
 /// Bagaimana sebuah sesi tampil di beranda.
 enum SessionDisplayStatus: Hashable, Sendable {
     case running
@@ -104,6 +122,22 @@ final class ExamSession: Identifiable {
 
     func field(withID id: UUID) -> FieldRecord? {
         fields.first { $0.id == id }
+    }
+
+    /// Freezes the session into a value the store can take across an actor boundary.
+    ///
+    /// Call this on the actor that owns the session — never inside the store — so `fields` is
+    /// copied while nothing can be mutating it.
+    func snapshot() -> SessionSnapshot {
+        SessionSnapshot(
+            id: id,
+            createdAt: createdAt,
+            patient: patient,
+            notes: notes,
+            status: status,
+            chosenGrade: chosenGrade,
+            fields: fields
+        )
     }
 
     // MARK: - Turunan

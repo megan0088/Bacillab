@@ -86,14 +86,22 @@ struct ScanView: View {
 
     // MARK: - Sections
 
+    /// The end of the batch currently being filled — 20, then 40, and so on.
+    ///
+    /// Scanning is not capped at one batch: reaching 2+ takes 50 fields and Negative takes 100,
+    /// so the counter has to keep moving past 20 rather than sitting at a ceiling.
+    private var batchCeiling: Int {
+        (session.fields.count / ExamSession.batchTarget + 1) * ExamSession.batchTarget
+    }
+
     private var fieldCounter: some View {
         VStack(spacing: 4) {
-            Text("\(session.fields.count) of \(ExamSession.batchTarget) fields")
+            Text("\(session.fields.count) of \(batchCeiling) fields")
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .contentTransition(.numericText())
 
             ProgressView(
-                value: Double(min(session.fields.count, ExamSession.batchTarget)),
+                value: Double(session.fields.count % ExamSession.batchTarget),
                 total: Double(ExamSession.batchTarget)
             )
             .tint(Color.accentColor)

@@ -77,9 +77,19 @@ final class ScanViewModel {
         guard !isScanning else { return }
         isScanning = true
 
+        // One batch beyond wherever the session already stands — `batchTarget` is how much one
+        // press adds, never how many fields a slide may have.
+        //
+        // A fixed ceiling at 20 made every grade except 3+ permanently unconfirmable: 2+ needs
+        // 50 fields and 1+/Scanty/Negative need 100, so the app could never reach the thresholds
+        // it grades against. Worse, it failed silently — at 20 fields the loop body simply never
+        // ran, the shutter blinked, and Review's "Continue Scanning" button returned the analyst
+        // to exactly that dead screen.
+        let target = session.fields.count + ExamSession.batchTarget
+
         scanTask = Task { [weak self] in
             guard let self else { return }
-            while !Task.isCancelled, session.fields.count < ExamSession.batchTarget {
+            while !Task.isCancelled, session.fields.count < target {
                 await self.captureField(session: session)
                 guard !Task.isCancelled else { break }
                 try? await Task.sleep(for: .milliseconds(self.scanIntervalMilliseconds))
@@ -160,7 +170,7 @@ final class ScanViewModel {
 
         let field = session.appendField(imageFileName: fileName, source: source)
         queue.enqueue(fieldID: field.id, imageData: jpeg, into: session)
-        try await store.save(session)
+        try await store.save(session.snapshot())
 
         scanLog.note("field \(field.index) recorded from \(source.rawValue), \(jpeg.count) bytes")
     }

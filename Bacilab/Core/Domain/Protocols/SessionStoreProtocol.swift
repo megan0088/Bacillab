@@ -2,7 +2,7 @@ import Foundation
 
 protocol SessionStoreProtocol: AnyObject {
     func allSessions() async throws -> [ExamSession]
-    func save(_ session: ExamSession) async throws
+    func save(_ snapshot: SessionSnapshot) async throws
     func delete(_ session: ExamSession) async throws
 
     /// Menulis berkas gambar satu lapang ke direktori sesi.
