@@ -25,7 +25,25 @@ struct ResultSheetView: View {
         }
     }
 
-    private var gradeLabel: String {
+    private var gradeLabel: String { Self.label(for: grade) }
+
+    /// The WHO/IUATLD criterion for a band — a definition, not a report of what was seen.
+    ///
+    /// These differ from the hi-fi's table, which had Negative as "no BTA in 1 field of view" and
+    /// Scanty as 1–10. Negative in particular has to say 100: the whole point of the field gates
+    /// is that one clean field is nowhere near enough to call a slide negative, and a reference
+    /// table saying otherwise is the sort of thing someone checks a result against.
+    private static func criterion(for grade: BTAGrade) -> String {
+        switch grade {
+        case .negative: return "No BTA in 100 fields of view"
+        case .scanty:   return "1–9 BTA in 100 fields of view; repeat examination advised"
+        case .plus1:    return "10–99 BTA in 100 fields of view"
+        case .plus2:    return "1–10 BTA per field, across at least 50 fields"
+        case .plus3:    return "More than 10 BTA per field, across at least 20 fields"
+        }
+    }
+
+    private static func label(for grade: BTAGrade) -> String {
         switch grade {
         case .negative: return "Negative"
         case .scanty:   return "Scanty"
@@ -35,16 +53,7 @@ struct ResultSheetView: View {
         }
     }
 
-    /// The WHO/IUATLD criterion for this band — a definition, not a report of what was seen.
-    private var gradeCriterion: String {
-        switch grade {
-        case .negative: return "No BTA in 100 fields of view"
-        case .scanty:   return "1–9 BTA in 100 fields of view; repeat examination advised"
-        case .plus1:    return "10–99 BTA in 100 fields of view"
-        case .plus2:    return "1–10 BTA per field across at least 50 fields"
-        case .plus3:    return "More than 10 BTA per field across at least 20 fields"
-        }
-    }
+    private var gradeCriterion: String { Self.criterion(for: grade) }
 
     /// Mean confidence over the fields that actually contributed a count.
     ///
@@ -161,19 +170,41 @@ struct ResultSheetView: View {
         .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4), lineWidth: 1))
     }
 
-    /// How the grade was arrived at.
+    /// The whole WHO/IUATLD scale, with this result's band marked.
     ///
-    /// A grade is an **extrapolation**: bacilli counted across the fields actually read, scaled
-    /// to 100 fields, landing in a band. "2+" does not mean two of anything. Without this the
-    /// reader has to take the letter on trust, and the one number that matters clinically is the
-    /// one they cannot check.
+    /// Shows where the reading sits among the five, so a reader can see what would have had to
+    /// be true for it to land anywhere else — and, underneath, how this one was actually reached.
+    /// A grade is an **extrapolation**: bacilli counted across the fields read, scaled to 100
+    /// fields, landing in a band. "2+" does not mean two of anything.
     @ViewBuilder
     private var gradeDerivation: some View {
         let fields = max(session.examinedFieldCount, 1)
         let per100 = Double(session.totalBTA) / Double(fields) * 100
 
-        VStack(alignment: .leading, spacing: 6) {
-            Divider()
+        VStack(alignment: .leading, spacing: 0) {
+            ForEach(BTAGrade.allCases, id: \.self) { band in
+                Divider().padding(.vertical, 10)
+
+                HStack(alignment: .top, spacing: 8) {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(Self.label(for: band))
+                            .font(.system(.subheadline, design: .rounded, weight: .bold))
+                            .foregroundStyle(band == grade ? gradeColor : .primary)
+                        Text(Self.criterion(for: band))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    if band == grade {
+                        Image(systemName: "checkmark")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(gradeColor)
+                    }
+                }
+            }
+
+            Divider().padding(.vertical, 10)
 
             derivationRow("Counted",
                           "\(session.totalBTA) BTA across \(session.examinedFieldCount) fields read")
