@@ -6,8 +6,9 @@ import SwiftUI
 /// yang ternormalisasi jatuh tepat di tempatnya. Menggambar box di atas gambar lain — foto
 /// mentah, atau preview langsung — akan menempatkannya di atas basil yang bukan itu.
 ///
-/// Bingkainya **kotak**, dengan lingkaran putus-putus sebagai panduan okuler. Masker lingkaran
-/// akan menyembunyikan sudut-sudutnya, sekitar 21% dari luas yang tetap dibaca model.
+/// The frame is a **circle**, matching the microscope's field of view — and safe only because
+/// `MultiDetectorService` cuts the models to the same circle, so nothing is counted outside what
+/// is drawn here.
 struct FieldCanvas: View {
     let image: UIImage?
     let readings: [DetectorReading]
@@ -77,13 +78,10 @@ struct FieldCanvas: View {
                     )
             }
 
-            Circle()
-                .stroke(.white.opacity(0.3), style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                .padding(2)
         }
         .frame(width: side, height: side)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Color(.systemGray3), lineWidth: 1))
+        .clipShape(Circle())
+        .overlay(Circle().stroke(.white.opacity(0.25), lineWidth: 1))
     }
 }
 

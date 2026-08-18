@@ -122,12 +122,13 @@ struct ScanView: View {
         .padding(.vertical, 14)
     }
 
-    /// Square, not a circle.
+    /// Circular, matching the microscope's own field of view.
     ///
-    /// The preview layer is `resizeAspectFill`, so this square is exactly the crop the models
-    /// receive. The dashed circle inside it is only a guide for aiming the eyepiece — it clips
-    /// nothing. A circular *mask* would hide this square's corners, roughly 21% of its area,
-    /// which the models still read and still count.
+    /// This is safe only because the models are cut to the same circle
+    /// (`MultiDetectorService.restrictedToFieldOfView`): detections outside it are discarded, so
+    /// everything counted is visible and everything visible is counted. Masking the display
+    /// alone would hide roughly 21% of the analysed square while still counting bacilli inside
+    /// it — marks the analyst could never check.
     private func viewfinder(side: CGFloat) -> some View {
         ZStack {
             #if targetEnvironment(simulator)
@@ -142,16 +143,12 @@ struct ScanView: View {
             CameraPreviewView(session: viewModel.session)
             #endif
 
-            Circle()
-                .stroke(.white.opacity(0.35), style: StrokeStyle(lineWidth: 1, dash: [5, 5]))
-                .padding(2)
         }
         .frame(width: side, height: side)
-        .clipShape(RoundedRectangle(cornerRadius: 14))
+        .clipShape(Circle())
         .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .stroke(viewModel.isScanning ? Color.accentColor : Color(.systemGray3),
-                        lineWidth: viewModel.isScanning ? 3 : 1)
+            Circle().stroke(viewModel.isScanning ? Color.accentColor : .white.opacity(0.25),
+                            lineWidth: viewModel.isScanning ? 3 : 1)
         )
         .shadow(color: .black.opacity(0.08), radius: 20, y: 6)
     }

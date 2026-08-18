@@ -80,13 +80,59 @@ final class MultiDetectorService: AnalysisServiceProtocol {
         multiLog.note("pilihan=\(selection.rawValue) grade-dari=\(selection.gradingDetector.rawValue) "
                       + "bacaan[\(summary.joined(separator: " "))] btaCount=\(result.btaCount)")
 
+        // Every model is cut to the same circular field of view before anything downstream sees
+        // it, so the comparison stays like-for-like and the grading count matches what is drawn.
+        let readings = outcomes.map { Self.restrictedToFieldOfView($0.reading) }
+        let gradingReading = readings.first { $0.detector == selection.gradingDetector }
+        let count = gradingReading?.btaCount ?? result.btaCount
+
         return AnalysisResult(
-            btaCount: result.btaCount,
-            confidence: result.confidence,
-            grade: result.grade,
+            btaCount: count,
+            confidence: gradingReading?.confidence ?? result.confidence,
+            grade: BTAGrade.grade(for: count, across: 1),
             analyzedAt: result.analyzedAt,
-            detectedBoxes: result.detectedBoxes,
-            readings: outcomes.map(\.reading)
+            detectedBoxes: gradingReading?.boxes ?? result.detectedBoxes,
+            readings: readings
+        )
+    }
+
+
+    // MARK: - Bidang pandang lingkaran
+
+    /// Drops detections whose centre falls outside the inscribed circle.
+    ///
+    /// The viewfinder and the review canvas both draw the field as a circle, matching the
+    /// microscope's own field of view. Restricting the models to that same circle is what keeps
+    /// the two honest: **everything counted is visible, and everything visible is counted.**
+    /// Masking the display alone would hide roughly 21% of the analysed square while still
+    /// counting bacilli inside it — marks the analyst could never check.
+    ///
+    /// The cost is real and worth stating: about a fifth of each captured square is discarded,
+    /// so a slide needs proportionally more fields to reach the same bacilli count, and the
+    /// WHO/IUATLD field gates take longer to satisfy.
+    ///
+    /// A box counts by its centre. Boxes are normalised to the square, so the circle is centred
+    /// at (0.5, 0.5) with radius 0.5.
+    private static func restrictedToFieldOfView(_ reading: DetectorReading) -> DetectorReading {
+        guard reading.failure == nil, !reading.boxes.isEmpty else { return reading }
+
+        let kept = reading.boxes.filter { box in
+            let dx = Double(box.cx) - 0.5
+            let dy = Double(box.cy) - 0.5
+            return dx * dx + dy * dy <= 0.25
+        }
+        guard kept.count != reading.boxes.count else { return reading }
+
+        // `confidence` is left as the model reported it: it is that model's mean score over the
+        // detections it kept, and the per-box scores needed to recompute it over this subset are
+        // not carried on a reading. It therefore covers a slightly wider set than `btaCount`.
+        return DetectorReading(
+            detector: reading.detector,
+            btaCount: kept.count,
+            confidence: reading.confidence,
+            elapsed: reading.elapsed,
+            boxes: kept,
+            failure: nil
         )
     }
 
