@@ -367,6 +367,6 @@ struct ReviewView: View {
     }
     let deps = AppDependencies()
     return NavigationStack {
-        ReviewView(session: session, queue: deps.makeAnalysisQueue(), dependencies: deps)
+        ReviewView(session: session, queue: deps.queue(for: session), dependencies: deps)
     }
 }

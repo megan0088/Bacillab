@@ -20,7 +20,7 @@ struct ScanView: View {
         _viewModel = State(initialValue: ScanViewModel(
             cameraService: dependencies.cameraService,
             store: dependencies.sessionStore,
-            queue: dependencies.makeAnalysisQueue()
+            queue: dependencies.queue(for: session)
         ))
     }
 

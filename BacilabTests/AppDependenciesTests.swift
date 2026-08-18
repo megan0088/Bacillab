@@ -8,14 +8,22 @@ struct AppDependenciesTests {
         #expect(AppDependencies().sessionStore is SessionStore)
     }
 
-    @Test("Setiap sesi mendapat antrean analisisnya sendiri")
+    @Test("Sesi yang sama selalu mendapat antrean yang sama")
     @MainActor
-    func eachSessionGetsItsOwnQueue() {
+    func sameSessionReusesItsQueue() {
         let deps = AppDependencies()
-        let a = deps.makeAnalysisQueue()
-        let b = deps.makeAnalysisQueue()
+        let session = ExamSession()
 
-        #expect(a !== b,
+        #expect(deps.queue(for: session) === deps.queue(for: session),
+                "Mencetak antrean baru tiap permintaan membuat dua pekerja menggilas sesi yang sama")
+    }
+
+    @Test("Sesi berbeda mendapat antrean berbeda")
+    @MainActor
+    func differentSessionsGetDifferentQueues() {
+        let deps = AppDependencies()
+
+        #expect(deps.queue(for: ExamSession()) !== deps.queue(for: ExamSession()),
                 "Antrean bersama akan mencampur lapang dari dua sesi ke dalam satu urutan")
     }
 }

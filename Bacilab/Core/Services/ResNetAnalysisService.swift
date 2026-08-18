@@ -118,11 +118,17 @@ final class ResNetAnalysisService: AnalysisServiceProtocol {
 
         // `labels` is deliberately not requested: the model has a single foreground class,
         // so every detection is class 1 (AFB) and the tensor carries no information.
-        let outputs = try session.run(
-            withInputs: ["image": input],
-            outputNames: ["boxes", "scores"],
-            runOptions: nil
-        )
+        // `inputData` must stay alive for the whole run: `ORTValue` holds the buffer rather than
+        // copying it, and its last syntactic use is the line above — ARC is free to release it
+        // before `run` finishes, which would have the model read freed memory. The behaviour
+        // would depend on allocator timing, so it would fail intermittently rather than always.
+        let outputs = try withExtendedLifetime(inputData) {
+            try session.run(
+                withInputs: ["image": input],
+                outputNames: ["boxes", "scores"],
+                runOptions: nil
+            )
+        }
 
         guard let boxesValue = outputs["boxes"], let scoresValue = outputs["scores"] else {
             throw AnalysisError.inferenceFailure("Output model tidak dikenali.")

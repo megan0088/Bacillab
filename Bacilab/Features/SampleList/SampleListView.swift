@@ -58,7 +58,7 @@ struct SampleListView: View {
             ScanView(session: session, dependencies: dependencies)
         case .reviewing:
             ReviewView(session: session,
-                       queue: dependencies.makeAnalysisQueue(),
+                       queue: dependencies.queue(for: session),
                        dependencies: dependencies)
         case .published:
             ResultSheetView(session: session, dependencies: dependencies)
