@@ -77,6 +77,9 @@ struct ResultSheetView: View {
         .background(Color(.systemGroupedBackground))
         .navigationTitle("Interpretation")
         .navigationBarTitleDisplayMode(.large)
+        // Notes are saved on the way out rather than per keystroke: the manifest is rewritten
+        // whole each time, and a write per character would be pure churn.
+        .onDisappear { persist() }
     }
 
     // MARK: - Patient
@@ -123,10 +126,13 @@ struct ResultSheetView: View {
         }
     }
 
-    /// The grade, and a chevron that opens how it was reached.
+    /// The grade, and a chevron that opens the scale so the lab can re-decide it.
     ///
-    /// The chevron expands an explanation; it is not a picker. A grade chosen here would put
-    /// grade-setting on a second screen, which is precisely what Review exists to own alone.
+    /// The counts are frozen at publication and cannot be touched here; the grade is not. A lab
+    /// technician revising an extrapolated grade is ordinary practice, and this is where they do
+    /// it. What matters is that the field-count gate follows whatever they pick — choosing
+    /// Negative on 20 fields immediately stamps PROVISIONAL and says how many fields short it
+    /// is, so re-deciding can never be a way to make a provisional reading look final.
     private var gradeBox: some View {
         VStack(alignment: .leading, spacing: 8) {
             Button {
@@ -185,23 +191,28 @@ struct ResultSheetView: View {
             ForEach(BTAGrade.allCases, id: \.self) { band in
                 Divider().padding(.vertical, 10)
 
-                HStack(alignment: .top, spacing: 8) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        Text(Self.label(for: band))
-                            .font(.system(.subheadline, design: .rounded, weight: .bold))
-                            .foregroundStyle(band == grade ? gradeColor : .primary)
-                        Text(Self.criterion(for: band))
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
+                Button {
+                    session.chooseGrade(band)
+                    persist()
+                } label: {
+                    HStack(alignment: .top, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(Self.label(for: band))
+                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                .foregroundStyle(band == grade ? gradeColor : .primary)
+                            Text(Self.criterion(for: band))
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 8)
+                        Image(systemName: band == grade ? "checkmark.circle.fill" : "circle")
+                            .font(.subheadline)
+                            .foregroundStyle(band == grade ? gradeColor : Color(.systemGray3))
                     }
-                    Spacer(minLength: 8)
-                    if band == grade {
-                        Image(systemName: "checkmark")
-                            .font(.caption.weight(.bold))
-                            .foregroundStyle(gradeColor)
-                    }
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
 
             Divider().padding(.vertical, 10)
@@ -289,6 +300,16 @@ struct ResultSheetView: View {
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.trailing)
+        }
+    }
+
+    /// Writes the session back after the lab changes something here.
+    ///
+    /// Only the grade and the notes can reach this — the counts were frozen when the result was
+    /// published, and nothing on this screen can move them.
+    private func persist() {
+        Task {
+            try? await dependencies.sessionStore.save(session.snapshot())
         }
     }
 
