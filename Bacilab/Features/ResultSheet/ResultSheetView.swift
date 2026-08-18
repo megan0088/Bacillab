@@ -1,12 +1,16 @@
 import SwiftUI
 
-/// Lembar hasil. Read-only, dan sengaja demikian.
+/// The published result sheet.
 ///
-/// Grade, hitungan, dan catatan semuanya diputuskan di Review. Kalau layar ini bisa mengubah
-/// salah satunya, akan ada dua tempat yang menentukan grade lagi — persis tabrakan yang
-/// rancangan ini hilangkan.
+/// The grade, the per-field counts and which fields were discarded were all decided in Review.
+/// Nothing here can change any of them — a second screen that could set a grade is the collision
+/// this redesign removed. Lab notes are the one exception, and deliberately so: a comment is
+/// often added after a result has been read, and it is not part of the reading.
+///
+/// This is also the screen reached by tapping an examination in history, so it is the same view
+/// in both places rather than a sibling that could drift.
 struct ResultSheetView: View {
-    let session: ExamSession
+    @Bindable var session: ExamSession
     let dependencies: AppDependencies
 
     @State private var isGradeExpanded = false
@@ -24,183 +28,78 @@ struct ResultSheetView: View {
     private var gradeLabel: String {
         switch grade {
         case .negative: return "Negative"
-        case .scanty:   return "Scanty (Borderline)"
-        case .plus1:    return "Positif (1+)"
-        case .plus2:    return "Positif (2+)"
-        case .plus3:    return "Positif (3+)"
+        case .scanty:   return "Scanty"
+        case .plus1:    return "Positive (1+)"
+        case .plus2:    return "Positive (2+)"
+        case .plus3:    return "Positive (3+)"
         }
     }
 
-    private var gradeDescription: String {
+    /// The WHO/IUATLD criterion for this band — a definition, not a report of what was seen.
+    private var gradeCriterion: String {
         switch grade {
-        case .negative: return "Tidak ditemukan BTA dalam 100 lapang pandang."
-        case .scanty:   return "Ditemukan 1–9 BTA dalam 100 lapang pandang. Perlu pemeriksaan ulang."
-        case .plus1:    return "Ditemukan 10–99 BTA dalam 100 lapang pandang."
-        case .plus2:    return "Ditemukan 1–10 BTA per lapang pandang dalam setidaknya 50 lapang."
-        case .plus3:    return "Ditemukan lebih dari 10 BTA per lapang pandang dalam setidaknya 20 lapang."
+        case .negative: return "No BTA in 100 fields of view"
+        case .scanty:   return "1–9 BTA in 100 fields of view; repeat examination advised"
+        case .plus1:    return "10–99 BTA in 100 fields of view"
+        case .plus2:    return "1–10 BTA per field across at least 50 fields"
+        case .plus3:    return "More than 10 BTA per field across at least 20 fields"
         }
+    }
+
+    /// Mean confidence over the fields that actually contributed a count.
+    ///
+    /// Fields the model read as empty carry no confidence — there is nothing to be confident
+    /// about — so they are left out rather than averaged in as zero.
+    private var meanConfidence: Double? {
+        let values = session.countedFields.compactMap { $0.analysis?.confidence }
+        guard !values.isEmpty else { return nil }
+        return values.reduce(0, +) / Double(values.count)
     }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                patientSection
-                resultSection
-                statsSection
-                if !session.notes.isEmpty { notesSection }
+                patientCard
+                resultCard
+                notesCard
             }
             .padding(20)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Result Sheet")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationTitle("Interpretation")
+        .navigationBarTitleDisplayMode(.large)
     }
 
-    // MARK: - Pasien
+    // MARK: - Patient
 
-    private var patientSection: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("Patient Information")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .padding(.bottom, 12)
+    private var patientCard: some View {
+        card {
+            sectionHeading("Patient Information", tinted: true)
 
-            infoRow("Laboratorium", "Electra Lab")
-            Divider().padding(.leading, 120)
-            infoRow("No. Rekam Medis", session.patient.medicalRecordNumber)
-            Divider().padding(.leading, 120)
+            infoRow("MRN", session.patient.medicalRecordNumber)
             infoRow("NIK", session.patient.nationalID)
-            Divider().padding(.leading, 120)
-            infoRow("Nama", session.patient.name)
-            Divider().padding(.leading, 120)
-            infoRow("Tanggal Lahir", formatted(session.patient.dateOfBirth))
-            Divider().padding(.leading, 120)
-            infoRow("Tgl. Pemeriksaan", formatted(session.patient.examinationDate))
-            Divider().padding(.leading, 120)
-            infoRow("Waktu Ambil Sampel", formatted(session.patient.sampleCollectedAt, withTime: true))
-        }
-        .padding(16)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func formatted(_ date: Date, withTime: Bool = false) -> String {
-        let locale = Locale(identifier: "id_ID")
-        return withTime
-            ? date.formatted(.dateTime.day().month(.wide).year().hour().minute().locale(locale))
-            : date.formatted(.dateTime.day().month(.wide).year().locale(locale))
-    }
-
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(width: 130, alignment: .leading)
-            Text(value.isEmpty ? "-" : value)
-                .font(.system(.caption, design: .rounded, weight: .medium))
-                .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .padding(.vertical, 10)
-    }
-
-    // MARK: - Hasil
-
-    /// How the grade was arrived at, shown when the grade row is tapped.
-    ///
-    /// A grade is an **extrapolation**: the bacilli counted across the fields actually read,
-    /// scaled to 100 fields, landing in a band. "2+" does not mean two of anything. Without this
-    /// the reader has to take the letter on trust, and the one number that matters clinically is
-    /// the one they cannot check.
-    @ViewBuilder
-    private var gradeDerivation: some View {
-        let fields = max(session.examinedFieldCount, 1)
-        let per100 = Double(session.totalBTA) / Double(fields) * 100
-
-        VStack(alignment: .leading, spacing: 6) {
-            Divider().overlay(.white.opacity(0.35))
-
-            derivationRow("Counted",
-                          "\(session.totalBTA) BTA across \(session.examinedFieldCount) fields read")
-            derivationRow("Extrapolated", String(format: "%.0f BTA per 100 fields", per100))
-            derivationRow("Band", "\(grade.rawValue) — \(gradeDescription)")
-            derivationRow("Fields required",
-                          session.isGradeConfirmed
-                          ? "\(grade.minimumFields) (WHO/IUATLD) — met"
-                          : "\(grade.minimumFields) (WHO/IUATLD) — \(session.fieldsRemainingForGrade) short")
-
-            // The comparison model never contributes to this number, and a reader has no other
-            // way to know which of the two produced it.
-            derivationRow("Counted by", "ResNet. YOLO11 read the same fields for comparison only.")
-
-            // A slide read partly through the eyepiece and partly from imported photos is two
-            // acquisitions pooled into one grade. Silent about it, this sheet would imply one.
-            if session.importedFieldCount > 0 {
-                derivationRow("Imported fields",
-                              "\(session.importedFieldCount) of \(session.examinedFieldCount) came from photos, not the eyepiece")
-            }
-        }
-        .padding(.top, 2)
-    }
-
-    private func derivationRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            Text(label)
-                .font(.caption2.weight(.semibold))
-                .frame(width: 108, alignment: .leading)
-                .opacity(0.75)
-            Text(value)
-                .font(.caption2)
-                .fixedSize(horizontal: false, vertical: true)
-            Spacer(minLength: 0)
+            infoRow("Name", session.patient.name)
+            infoRow("DOB", formatted(session.patient.dateOfBirth))
+            infoRow("Examination Date", formatted(session.patient.examinationDate))
         }
     }
 
-    private var resultSection: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Result")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
+    // MARK: - Result
 
-            Label("AI analysis is not a medical diagnosis", systemImage: "exclamationmark.triangle.fill")
+    private var resultCard: some View {
+        card {
+            sectionHeading("Result", tinted: true)
+
+            Label("AI analysis ≠ Medical diagnosis", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
                 .foregroundStyle(.orange)
 
-            VStack(alignment: .leading, spacing: 8) {
-                Button {
-                    withAnimation(.snappy(duration: 0.22)) { isGradeExpanded.toggle() }
-                } label: {
-                    HStack(spacing: 10) {
-                        Image(systemName: grade == .negative
-                              ? "checkmark.shield.fill" : "exclamationmark.triangle.fill")
-                            .font(.title2)
-                        Text(gradeLabel)
-                            .font(.system(.title2, design: .rounded, weight: .black))
-                        Spacer()
-                        if !session.isGradeConfirmed {
-                            Text("PROVISIONAL")
-                                .font(.system(size: 10, weight: .heavy, design: .rounded))
-                                .padding(.horizontal, 7)
-                                .padding(.vertical, 3)
-                                .background(.white.opacity(0.25), in: Capsule())
-                        }
-                        Image(systemName: "chevron.down")
-                            .font(.subheadline.weight(.semibold))
-                            .rotationEffect(.degrees(isGradeExpanded ? 180 : 0))
-                    }
-                }
-                .foregroundStyle(.white)
+            gradeBox
 
-                Text(gradeDescription)
-                    .font(.caption)
-                    .opacity(0.85)
-                    .fixedSize(horizontal: false, vertical: true)
-
-                if isGradeExpanded { gradeDerivation }
-            }
-            .foregroundStyle(.white)
-            .padding(16)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(gradeColor, in: RoundedRectangle(cornerRadius: 14))
+            infoRow("Total Fields Read", "\(session.examinedFieldCount)")
+            infoRow("Total BTA Detected", "\(session.totalBTA)")
+            infoRow("AI Confidence",
+                    meanConfidence.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
 
             if !session.isGradeConfirmed {
                 Label(
@@ -213,66 +112,171 @@ struct ResultSheetView: View {
                 .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .padding(16)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
     }
 
-    // MARK: - Statistik
-
-    private var statsSection: some View {
-        HStack(spacing: 0) {
-            statCell(icon: "scope", label: "Fields Read", value: "\(session.examinedFieldCount)")
-            Divider().frame(height: 56)
-            statCell(icon: "microbe.fill", label: "Total BTA", value: "\(session.totalBTA)")
-            Divider().frame(height: 56)
-            statCell(icon: "hand.raised.fill", label: "Analyst Corrections",
-                     value: "\(session.fields.filter { $0.correctedCount != nil }.count)")
-        }
-        .padding(16)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
-    }
-
-    private func statCell(icon: String, label: String, value: String) -> some View {
-        VStack(spacing: 6) {
-            Image(systemName: icon)
-                .font(.system(size: 18))
-                .foregroundStyle(Color.accentColor)
-            Text(value)
-                .font(.system(.headline, design: .rounded, weight: .bold))
-            Text(label)
-                .font(.caption2)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Catatan
-
-    private var notesSection: some View {
+    /// The grade, and a chevron that opens how it was reached.
+    ///
+    /// The chevron expands an explanation; it is not a picker. A grade chosen here would put
+    /// grade-setting on a second screen, which is precisely what Review exists to own alone.
+    private var gradeBox: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Laboratory Notes")
-                .font(.system(.caption, design: .rounded, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-            Text(session.notes)
-                .font(.callout)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            Button {
+                withAnimation(.snappy(duration: 0.22)) { isGradeExpanded.toggle() }
+            } label: {
+                HStack(alignment: .firstTextBaseline) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(spacing: 8) {
+                            Text(gradeLabel)
+                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .foregroundStyle(gradeColor)
+
+                            if !session.isGradeConfirmed {
+                                Text("PROVISIONAL")
+                                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(Color.orange.opacity(0.15), in: Capsule())
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                        Text(gradeCriterion)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.leading)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    Spacer(minLength: 8)
+                    Image(systemName: "chevron.down")
+                        .font(.headline)
+                        .foregroundStyle(.secondary)
+                        .rotationEffect(.degrees(isGradeExpanded ? 180 : 0))
+                }
+            }
+            .buttonStyle(.plain)
+
+            if isGradeExpanded { gradeDerivation }
+        }
+        .padding(14)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .overlay(RoundedRectangle(cornerRadius: 12).stroke(Color(.systemGray4), lineWidth: 1))
+    }
+
+    /// How the grade was arrived at.
+    ///
+    /// A grade is an **extrapolation**: bacilli counted across the fields actually read, scaled
+    /// to 100 fields, landing in a band. "2+" does not mean two of anything. Without this the
+    /// reader has to take the letter on trust, and the one number that matters clinically is the
+    /// one they cannot check.
+    @ViewBuilder
+    private var gradeDerivation: some View {
+        let fields = max(session.examinedFieldCount, 1)
+        let per100 = Double(session.totalBTA) / Double(fields) * 100
+
+        VStack(alignment: .leading, spacing: 6) {
+            Divider()
+
+            derivationRow("Counted",
+                          "\(session.totalBTA) BTA across \(session.examinedFieldCount) fields read")
+            derivationRow("Extrapolated", String(format: "%.0f BTA per 100 fields", per100))
+            derivationRow("Fields required",
+                          session.isGradeConfirmed
+                          ? "\(grade.minimumFields) (WHO/IUATLD) — met"
+                          : "\(grade.minimumFields) (WHO/IUATLD) — \(session.fieldsRemainingForGrade) short")
+            // Two models read every field but only one produces this number, and a reader has no
+            // other way to know which.
+            derivationRow("Counted by", "ResNet. YOLO11 read the same fields for comparison only.")
+
+            // A slide read partly through the eyepiece and partly from imported photos is two
+            // acquisitions pooled into one grade. Silent about it, this sheet would imply one.
+            if session.importedFieldCount > 0 {
+                derivationRow("Imported fields",
+                              "\(session.importedFieldCount) of \(session.examinedFieldCount) came from photos, not the eyepiece")
+            }
+        }
+    }
+
+    private func derivationRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Text(label)
+                .font(.caption2.weight(.semibold))
+                .frame(width: 108, alignment: .leading)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.caption2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+    }
+
+    // MARK: - Notes
+
+    private var notesCard: some View {
+        card {
+            sectionHeading("Notes by Medical Laboratory", tinted: false)
+
+            TextEditor(text: $session.notes)
+                .frame(minHeight: 90)
+                .scrollContentBackground(.hidden)
+                .padding(8)
+                .overlay(RoundedRectangle(cornerRadius: 10).stroke(Color(.systemGray4), lineWidth: 1))
+                .overlay(alignment: .topLeading) {
+                    if session.notes.isEmpty {
+                        Text("Enter notes (optional)...")
+                            .foregroundStyle(.tertiary)
+                            .padding(.top, 16)
+                            .padding(.leading, 13)
+                            .allowsHitTesting(false)
+                    }
+                }
+        }
+    }
+
+    // MARK: - Building blocks
+
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            content()
         }
         .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
+    }
+
+    private func sectionHeading(_ title: String, tinted: Bool) -> some View {
+        Text(title)
+            .font(.system(.headline, design: .rounded, weight: .bold))
+            .foregroundStyle(tinted ? Color.accentColor : .primary)
+    }
+
+    /// Label on the left, value on the right — the shape a printed lab report uses.
+    private func infoRow(_ label: String, _ value: String) -> some View {
+        HStack(alignment: .top) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
+            Spacer(minLength: 12)
+            Text(value.isEmpty ? "—" : value)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.trailing)
+        }
+    }
+
+    private func formatted(_ date: Date) -> String {
+        date.formatted(.dateTime.day().month(.wide).year())
     }
 }
 
-#Preview("Lembar Hasil – 3+ final") {
+#Preview("Interpretation – 2+ confirmed") {
     let session = ExamSession()
-    session.patient.name = "Ahmad Rizki"
+    session.patient.name = "Andreas Simbolon"
     session.patient.medicalRecordNumber = "RM 240724-001"
+    session.patient.nationalID = "3204012509900001"
     session.status = .published
-    for _ in 0..<20 {
+    for _ in 0..<50 {
         let f = session.appendField(imageFileName: "f.jpg")
         session.setAnalysis(FieldAnalysis(
-            readings: [DetectorReading(detector: .resnet, btaCount: 15,
-                                       confidence: 0.9, elapsed: 0.6)],
+            readings: [DetectorReading(detector: .resnet, btaCount: 3,
+                                       confidence: 0.98, elapsed: 0.6)],
             primary: .resnet), for: f.id)
     }
     return NavigationStack {
@@ -280,17 +284,16 @@ struct ResultSheetView: View {
     }
 }
 
-#Preview("Lembar Hasil – Negatif sementara") {
+#Preview("Interpretation – Negative, provisional") {
     let session = ExamSession()
     session.patient.name = "Siti Rahma"
     session.patient.medicalRecordNumber = "RM 240724-002"
-    session.notes = "Sputum encer, kualitas sampel kurang baik."
     session.status = .published
     for _ in 0..<20 {
         let f = session.appendField(imageFileName: "f.jpg")
         session.setAnalysis(FieldAnalysis(
             readings: [DetectorReading(detector: .resnet, btaCount: 0,
-                                       confidence: 0.8, elapsed: 0.6)],
+                                       confidence: 0, elapsed: 0.6)],
             primary: .resnet), for: f.id)
     }
     return NavigationStack {
