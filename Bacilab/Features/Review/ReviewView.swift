@@ -49,9 +49,14 @@ struct ReviewView: View {
             }
             .padding(.vertical, 16)
         }
-        .background(Color(.systemGroupedBackground))
+        .background(Color.black)
         .navigationTitle("Review")
-        .navigationBarTitleDisplayMode(.inline)
+        .navigationBarTitleDisplayMode(.large)
+        // Dark, like the capture screens either side of it: the analyst moves between them in a
+        // dim room and a white sheet between two black ones is the thing that hurts.
+        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .preferredColorScheme(.dark)
         .navigationDestination(isPresented: $goToResult) {
             ResultSheetView(session: session, dependencies: dependencies)
         }
@@ -122,23 +127,32 @@ struct ReviewView: View {
             Button {
                 viewModel.openKeypad()
             } label: {
-                HStack(alignment: .lastTextBaseline, spacing: 8) {
+                HStack(spacing: 10) {
                     Text(countLabel)
-                        .font(.system(size: 46, weight: .black, design: .rounded))
+                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .foregroundStyle(.white)
                         .contentTransition(.numericText())
                     Text("BTA")
-                        .font(.system(.title3, design: .rounded, weight: .bold))
-                        .foregroundStyle(.secondary)
-                    Image(systemName: "pencil.circle.fill")
-                        .font(.title3)
-                        .foregroundStyle(Color.accentColor)
+                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .foregroundStyle(.white.opacity(0.5))
+                    Image(systemName: "pencil")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.5))
                 }
+                .padding(.horizontal, 22)
+                .padding(.vertical, 10)
+                .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
+                .overlay(RoundedRectangle(cornerRadius: 10)
+                    .stroke(.white.opacity(0.25), lineWidth: 1))
             }
             .foregroundStyle(.primary)
 
             confidenceLine
         }
     }
+
+    /// Below this the field is flagged for a manual look. **Not calibrated** against read slides.
+    private static let lowConfidencePercent = 85
 
     private var countLabel: String {
         guard let field = viewModel.selectedField else { return "—" }
@@ -170,9 +184,23 @@ struct ReviewView: View {
                     .font(.caption)
                     .foregroundStyle(.orange)
             } else if let confidence = field.analysis?.confidence {
-                Text("Model is \(Int((confidence * 100).rounded()))% confident in the bacilli it marked")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                let percent = Int((confidence * 100).rounded())
+                VStack(spacing: 4) {
+                    Text("\(percent)% AI Confidence Level")
+                        .font(.caption)
+                        .foregroundStyle(.white.opacity(0.55))
+
+                    // Prompts a second look; it never changes a count. The threshold is a
+                    // starting point, not a calibrated one — and note the graph already discards
+                    // detections below 0.70, so this figure can never read lower than 70% however
+                    // weak the field is. It says how sure the model is about the bacilli it kept.
+                    if percent < Self.lowConfidencePercent {
+                        Label("Low AI Confidence, Verify Manually",
+                              systemImage: "exclamationmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+                }
             }
         }
     }
@@ -205,10 +233,10 @@ struct ReviewView: View {
             Button {
                 viewModel.selectNext()
             } label: {
-                Text("Save & Next")
-                    .font(.caption.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10))
+                Text("Sure & Continue")
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)
             }
             .disabled(viewModel.selectedIndex >= session.fields.count - 1)

@@ -33,7 +33,22 @@ final class YOLO11AnalysisService: AnalysisServiceProtocol {
             return nil
         }
         do {
-            let mlModel = try MLModel(contentsOf: url, configuration: MLModelConfiguration())
+            // Keep this model off the GPU.
+            //
+            // With the default `.all`, CoreML compiles it through MetalPerformanceShadersGraph,
+            // and on device that fails hard: `MPSGraphExecutable.mm: failed assertion
+            // 'Error: MLIR pass manager failed'`, which aborts the process — the app dies on the
+            // very first field it analyses. The simulator uses a different backend, so no test
+            // here can see it; it only appears on real hardware.
+            //
+            // `.cpuAndNeuralEngine` keeps the Neural Engine, which is the fast path anyway, and
+            // simply never enters the Metal compiler. If a device ever fails on the ANE path too,
+            // `.cpuOnly` is the safe fallback — this model is a comparison reading, never the
+            // number that grades a slide, so its speed is not load-bearing.
+            let configuration = MLModelConfiguration()
+            configuration.computeUnits = .cpuAndNeuralEngine
+
+            let mlModel = try MLModel(contentsOf: url, configuration: configuration)
             let vnModel = try VNCoreMLModel(for: mlModel)
             yolo11Log.note("model dimuat: \(url.lastPathComponent)")
             return vnModel

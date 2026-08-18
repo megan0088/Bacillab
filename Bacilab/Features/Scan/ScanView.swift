@@ -39,10 +39,15 @@ struct ScanView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .background(Color(.systemBackground))
+        .background(Color.black)
         .ignoresSafeArea(edges: .bottom)
-        .navigationTitle("Scan Session")
+        .navigationTitle("Capture Field")
         .navigationBarTitleDisplayMode(.inline)
+        // The capture screens are dark by design: the technician is looking into an eyepiece in
+        // a dim room, and a white screen beside it wrecks their dark adaptation.
+        .toolbarBackground(Color.black, for: .navigationBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
+        .preferredColorScheme(.dark)
         .navigationDestination(isPresented: $goToReview) {
             ReviewView(session: session, queue: viewModel.queue, dependencies: dependencies)
         }
@@ -95,21 +100,26 @@ struct ScanView: View {
     }
 
     private var fieldCounter: some View {
-        VStack(spacing: 4) {
-            Text("\(session.fields.count) of \(batchCeiling) fields")
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                .contentTransition(.numericText())
+        VStack(spacing: 6) {
+            HStack(spacing: 5) {
+                Text("\(session.fields.count) of \(batchCeiling)")
+                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .foregroundStyle(.white)
+                    .contentTransition(.numericText())
+                Text("Field to go")
+                    .font(.caption)
+                    .foregroundStyle(.white.opacity(0.55))
+            }
 
             ProgressView(
                 value: Double(session.fields.count % ExamSession.batchTarget),
                 total: Double(ExamSession.batchTarget)
             )
             .tint(Color.accentColor)
-            .padding(.horizontal, 40)
+            .padding(.horizontal, 60)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, 12)
-        .background(Color(.systemGray6))
+        .padding(.vertical, 14)
     }
 
     /// Square, not a circle.
@@ -149,11 +159,11 @@ struct ScanView: View {
     private var focusBadge: some View {
         Group {
             if viewModel.isBlurry {
-                Label("Focus not sharp", systemImage: "exclamationmark.triangle.fill")
+                Label("Camera out of focus", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
             } else {
                 Label("Focus sharp", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.white.opacity(0.5))
             }
         }
         .font(.caption.weight(.semibold))
@@ -161,58 +171,61 @@ struct ScanView: View {
     }
 
     private var controls: some View {
-        VStack(spacing: 14) {
+        VStack(spacing: 16) {
+            // A white shutter on black, the way every camera app draws it — the one control the
+            // technician has to find without looking away from the eyepiece.
             Button {
                 viewModel.toggleScan(session: session)
             } label: {
                 ZStack {
                     Circle()
-                        .stroke(viewModel.isScanning ? Color.accentColor : Color(.systemGray3),
-                                lineWidth: 3)
-                        .frame(width: 80, height: 80)
+                        .stroke(.white.opacity(viewModel.isScanning ? 1 : 0.45), lineWidth: 3)
+                        .frame(width: 78, height: 78)
                     Circle()
-                        .fill(viewModel.isScanning ? Color.accentColor : Color(.systemGray6))
-                        .frame(width: 68, height: 68)
-                    Image(systemName: viewModel.isScanning ? "stop.fill" : "viewfinder.circle.fill")
-                        .font(.system(size: 28))
-                        .foregroundStyle(viewModel.isScanning ? .white : Color.accentColor)
+                        .fill(viewModel.isScanning ? Color.accentColor : .white)
+                        .frame(width: 64, height: 64)
+                    if viewModel.isScanning {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 24))
+                            .foregroundStyle(.white)
+                    }
                 }
             }
 
             Text(viewModel.isScanning ? "Tap to stop" : "Start Scan")
                 .font(.caption2.weight(.semibold))
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.white.opacity(0.55))
 
-            // Importing a photo is the only way to exercise detection without a microscope
-            // clamped to the phone, so it sits beside the shutter rather than being buried.
-            PhotosPicker(selection: $pickedPhoto, matching: .images) {
-                Label(
-                    isImporting ? "Importing…" : "Import Photo",
-                    systemImage: isImporting ? "hourglass" : "photo.on.rectangle.angled"
-                )
-                .font(.caption.weight(.medium))
-                .foregroundStyle(Color.accentColor)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 9)
-                .background(Color.accentColor.opacity(0.12), in: Capsule())
-            }
-            .disabled(isImporting)
-
-            if !session.fields.isEmpty {
-                Button {
-                    viewModel.stopScan()
-                    session.status = .reviewing
-                    goToReview = true
-                } label: {
-                    Text("Done · Go to Review")
-                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 13)
-                        .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 14))
-                        .foregroundStyle(Color.accentColor)
+            HStack(spacing: 10) {
+                // Importing is the only way to exercise detection without a microscope clamped
+                // to the phone, so it stays beside the shutter rather than being buried.
+                PhotosPicker(selection: $pickedPhoto, matching: .images) {
+                    Label(
+                        isImporting ? "Importing…" : "Import Photo",
+                        systemImage: isImporting ? "hourglass" : "photo.on.rectangle.angled"
+                    )
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 9)
+                    .background(.white.opacity(0.12), in: Capsule())
                 }
-                .padding(.horizontal, 32)
-                .padding(.top, 6)
+                .disabled(isImporting)
+
+                if !session.fields.isEmpty {
+                    Button {
+                        viewModel.stopScan()
+                        session.status = .reviewing
+                        goToReview = true
+                    } label: {
+                        Label("Review", systemImage: "arrow.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 16)
+                            .padding(.vertical, 9)
+                            .background(Color.accentColor, in: Capsule())
+                    }
+                }
             }
         }
     }
