@@ -23,6 +23,30 @@ struct FieldAnalysis: Codable, Hashable, Sendable {
     }
 }
 
+/// Where a field's image came from.
+///
+/// Recorded per field rather than per session: a slide read partly through the eyepiece and
+/// partly from imported photos pools two different acquisitions into one count, and without
+/// this nothing downstream would show that it happened.
+enum FieldSource: String, Codable, Hashable, Sendable, CaseIterable {
+    case camera
+    case gallery
+
+    var label: String {
+        switch self {
+        case .camera:  return "Camera"
+        case .gallery: return "Imported"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .camera:  return "camera.fill"
+        case .gallery: return "photo.on.rectangle.angled"
+        }
+    }
+}
+
 /// Satu lapang pandang yang sudah direkam.
 ///
 /// `imageFileName` relatif terhadap direktori sesi, bukan URL absolut: path kontainer
@@ -32,6 +56,7 @@ struct FieldRecord: Identifiable, Codable, Hashable, Sendable {
     let id: UUID
     let index: Int
     let imageFileName: String
+    let source: FieldSource
     var analysis: FieldAnalysis?
     var correctedCount: Int?
     var isExcluded: Bool
@@ -40,6 +65,7 @@ struct FieldRecord: Identifiable, Codable, Hashable, Sendable {
         id: UUID = UUID(),
         index: Int,
         imageFileName: String,
+        source: FieldSource = .camera,
         analysis: FieldAnalysis? = nil,
         correctedCount: Int? = nil,
         isExcluded: Bool = false
@@ -47,9 +73,30 @@ struct FieldRecord: Identifiable, Codable, Hashable, Sendable {
         self.id = id
         self.index = index
         self.imageFileName = imageFileName
+        self.source = source
         self.analysis = analysis
         self.correctedCount = correctedCount
         self.isExcluded = isExcluded
+    }
+
+    // MARK: - Codable
+
+    private enum CodingKeys: String, CodingKey {
+        case id, index, imageFileName, source, analysis, correctedCount, isExcluded
+    }
+
+    /// Hand-written only so `source` may be absent. Manifests written before fields recorded
+    /// their origin decode as camera fields instead of failing, which would otherwise take the
+    /// whole session down with them — `SessionStore` skips a session it cannot decode.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        index = try container.decode(Int.self, forKey: .index)
+        imageFileName = try container.decode(String.self, forKey: .imageFileName)
+        source = try container.decodeIfPresent(FieldSource.self, forKey: .source) ?? .camera
+        analysis = try container.decodeIfPresent(FieldAnalysis.self, forKey: .analysis)
+        correctedCount = try container.decodeIfPresent(Int.self, forKey: .correctedCount)
+        isExcluded = try container.decode(Bool.self, forKey: .isExcluded)
     }
 
     /// Hitungan yang berlaku, atau nil kalau belum ada.

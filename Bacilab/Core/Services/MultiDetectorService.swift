@@ -22,9 +22,16 @@ final class MultiDetectorService: AnalysisServiceProtocol {
     /// fourth model touches this line and nothing else in the orchestration below.
     private let detectors: [DetectorKind: any AnalysisServiceProtocol]
 
+    /// YOLOv8 is switched off here rather than deleted.
+    ///
+    /// Only ResNet and YOLO11 ship for now. `DetectorKind.yolo`, `YOLOAnalysisService` and the
+    /// bundled `BTADetector.mlmodelc` all remain intact, so turning it back on is uncommenting
+    /// one line — and, just as importantly, sessions already saved with YOLOv8 readings still
+    /// decode. `analyze` filters on `detectors[$0] != nil`, so an absent entry is simply not run;
+    /// nothing else needs to know.
     init(detectors: [DetectorKind: any AnalysisServiceProtocol] = [
         .resnet: ResNetAnalysisService(),
-        .yolo: YOLOAnalysisService(),
+        // .yolo: YOLOAnalysisService(),
         .yolo11: YOLO11AnalysisService(),
     ]) {
         self.detectors = detectors

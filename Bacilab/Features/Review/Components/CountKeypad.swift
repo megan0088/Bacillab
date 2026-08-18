@@ -41,12 +41,12 @@ struct CountKeypad: View {
             }
 
             HStack(spacing: 10) {
-                Button("Batal", action: onCancel)
+                Button("Cancel", action: onCancel)
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.secondary)
 
-                Button("Simpan", action: onConfirm)
+                Button("Save", action: onConfirm)
                     .frame(maxWidth: .infinity, minHeight: 48)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)

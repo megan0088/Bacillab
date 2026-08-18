@@ -1,10 +1,9 @@
 import SwiftUI
 
-/// Data pasien dan sampel, sebelum sesi scan dimulai.
+/// Patient and sample details, captured before the scan session starts.
 ///
-/// Dependency diterima sebagai `let` eksplisit, bukan `@Environment`: view ini di-push di
-/// dalam `NavigationStack` sebuah sheet, dan `@Environment(AppDependencies.self)` di sana
-/// akan crash saat runtime.
+/// Dependencies arrive as an explicit `let`, not `@Environment`: this view is pushed inside a
+/// sheet's `NavigationStack`, where `@Environment(AppDependencies.self)` crashes at runtime.
 struct PatientDataView: View {
     @Bindable var session: ExamSession
     let dependencies: AppDependencies
@@ -13,24 +12,22 @@ struct PatientDataView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-                sectionHeader("Informasi Pasien")
+                // Field names sit in the placeholder rather than on a label above, matching the
+                // hi-fi. The grouping is corrected, though: the design file placed Patient Name
+                // under "Test Information", which is not where anyone would look for it.
+                sectionHeader("Patient Information")
 
-                formField(label: "No. Rekam Medis", text: $session.patient.medicalRecordNumber,
-                          placeholder: "Contoh: RM 240724-001")
-                formField(label: "NIK", text: $session.patient.nationalID,
-                          placeholder: "16 digit")
-                formField(label: "Nama Pasien", text: $session.patient.name,
-                          placeholder: "Masukkan nama lengkap")
-                dateField(label: "Tanggal Lahir", date: $session.patient.dateOfBirth)
-                formField(label: "Alamat", text: $session.patient.address,
-                          placeholder: "Alamat pasien")
-                formField(label: "No. Telepon", text: $session.patient.phone,
-                          placeholder: "08xx-xxxx-xxxx")
+                formField("Medical Record Number (MRN)", text: $session.patient.medicalRecordNumber)
+                formField("NIK", text: $session.patient.nationalID)
+                formField("Patient Name", text: $session.patient.name)
+                dateField("Date of Birth", date: $session.patient.dateOfBirth)
+                formField("Address", text: $session.patient.address)
+                formField("Phone Number", text: $session.patient.phone)
 
-                sectionHeader("Informasi Pemeriksaan")
+                sectionHeader("Test Information")
 
-                dateField(label: "Tanggal Pemeriksaan", date: $session.patient.examinationDate)
-                dateField(label: "Waktu Pengambilan Sampel", date: $session.patient.sampleCollectedAt,
+                dateField("Examination Date", date: $session.patient.examinationDate)
+                dateField("Sample Collection Time", date: $session.patient.sampleCollectedAt,
                           components: [.date, .hourAndMinute])
 
                 Spacer(minLength: 24)
@@ -38,7 +35,7 @@ struct PatientDataView: View {
                 NavigationLink {
                     ScanView(session: session, dependencies: dependencies)
                 } label: {
-                    Label("Buka Kamera", systemImage: "camera.fill")
+                    Label("Open Camera", systemImage: "camera.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
                         .font(.system(.body, design: .rounded, weight: .semibold))
@@ -48,7 +45,7 @@ struct PatientDataView: View {
                 .disabled(!session.patient.isComplete)
 
                 if !session.patient.isComplete {
-                    Text("Nama pasien dan nomor rekam medis wajib diisi.")
+                    Text("Patient name and medical record number are required.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -56,11 +53,11 @@ struct PatientDataView: View {
             .padding(24)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Data Pasien")
+        .navigationTitle("Patient Data")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
-                Button("Batal") { dismiss() }
+                Button("Cancel") { dismiss() }
             }
         }
     }
@@ -71,52 +68,46 @@ struct PatientDataView: View {
             .foregroundStyle(Color.accentColor)
     }
 
-    private func formField(label: String, text: Binding<String>, placeholder: String) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            TextField(placeholder, text: text)
-                .padding(14)
-                .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(Color(.systemGray4), lineWidth: 1)
-                )
-        }
-    }
-
-    private func dateField(
-        label: String,
-        date: Binding<Date>,
-        components: DatePickerComponents = .date
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            HStack {
-                DatePicker("", selection: date, displayedComponents: components)
-                    .labelsHidden()
-                Spacer()
-            }
+    private func formField(_ placeholder: String, text: Binding<String>) -> some View {
+        TextField(placeholder, text: text)
             .padding(14)
             .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
             .overlay(
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(Color(.systemGray4), lineWidth: 1)
             )
+    }
+
+    /// A date picker has no placeholder to put a name in, so its name stays a leading label —
+    /// which is also how the hi-fi draws these rows.
+    private func dateField(
+        _ label: String,
+        date: Binding<Date>,
+        components: DatePickerComponents = .date
+    ) -> some View {
+        HStack {
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            DatePicker("", selection: date, displayedComponents: components)
+                .labelsHidden()
         }
+        .padding(14)
+        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color(.systemGray4), lineWidth: 1)
+        )
     }
 }
 
-#Preview("Data Pasien – kosong") {
+#Preview("Patient Data – empty") {
     NavigationStack {
         PatientDataView(session: ExamSession(), dependencies: AppDependencies())
     }
 }
 
-#Preview("Data Pasien – terisi") {
+#Preview("Patient Data – filled") {
     let session = ExamSession()
     session.patient.name = "Ahmad Rizki"
     session.patient.medicalRecordNumber = "RM 240724-001"

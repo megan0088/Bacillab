@@ -452,7 +452,11 @@ struct FieldRecord: Identifiable, Codable, Hashable, Sendable {
     }
 
     /// Masih menunggu giliran di antrean analisis.
-    var isPending: Bool { analysis == nil && correctedCount == nil }
+    ///
+    /// Ikut memeriksa `isExcluded` seperti dua properti di atas: lapang yang dibuang analis
+    /// sebelum sempat dianalisis bukan lapang yang masih mengantre, dan melaporkannya begitu
+    /// akan membuat penghitung "menganalisis n dari m" tidak pernah selesai.
+    var isPending: Bool { !isExcluded && analysis == nil && correctedCount == nil }
 }
 ```
 
@@ -596,7 +600,7 @@ struct ExamSessionTests {
     @Test("Grade pilihan analis mengalahkan grade usulan")
     func chosenGradeWins() {
         let session = ExamSession()
-        fill(session, count: 10, bta: 20)      // 200 per 100 lapang → 2+
+        fill(session, count: 10, bta: 2)       // 20 BTA / 10 lapang = 200 per 100 → 2+
 
         #expect(session.suggestedGrade == .plus2)
         #expect(session.reportedGrade == .plus2)
@@ -1407,6 +1411,27 @@ Scan tidak boleh menunggu model. Setiap lapang yang tersimpan masuk antrean; pek
 **Serial, bukan paralel.** ResNet berjalan dalam hitungan detik di perangkat; menjalankan beberapa lapang sekaligus akan menggilas CPU dan memicu throttling termal di tengah sesi — tepat ketika teknisi paling tidak ingin diperlambat.
 
 Antrean di-`@MainActor` karena ia memutasi `ExamSession` yang `@Observable` dan menggerakkan UI. Kerja beratnya sendiri tetap di luar: `MultiDetectorService` sudah menjalankan ORT pada `DispatchQueue` privatnya.
+
+> **Amandemen setelah review (commit `a1aa50d`).** Kode Step 3 di bawah punya bug konkurensi
+> nyata dan sudah diperbaiki saat implementasi — **rujuk commit itu, bukan kode di bawah.**
+>
+> `cancelAll()` menandai worker cancelled tapi meninggalkannya non-nil, sehingga `enqueue()`
+> berikutnya melihat `worker != nil` dan tidak memulai worker baru. Worker lama keluar dari loop
+> karena `Task.isCancelled` **sebelum** sempat memanggil `takeNextJob()`, lalu menulis
+> `worker = nil`. Job baru terdampar tanpa pekerja, dan `waitUntilIdle()` langsung kembali karena
+> `worker` sudah nil — layar Review bisa menampilkan total final yang kehilangan satu lapang,
+> tanpa lapang itu muncul di `fieldsNeedingManualCount`.
+>
+> Perbaikannya: penghitung generasi yang di-bump oleh `cancelAll()` (yang juga menyetel
+> `worker = nil` seketika), dan dijaga worker sebelum setiap penulisan ke `remaining`/`worker`,
+> sehingga worker basi tidak pernah menimpa milik worker yang lebih baru. `Job` juga kini
+> membawa `session`-nya sendiri, sehingga parameter `into:` benar-benar dihormati tiap panggilan
+> alih-alih hanya pada panggilan yang kebetulan memulai worker.
+>
+> Tes `cancelStopsPendingWork` juga diperbaiki: `#expect(callCount < 10)` tidak pernah bisa gagal,
+> karena `enqueue` tanpa `await` membuat seluruh loop dan `cancelAll()` berjalan sinkron sebelum
+> body worker sempat jalan — `callCount` deterministik 0. Sekarang ada jeda supaya worker
+> benar-benar mulai, dan ambangnya `== 1`.
 
 - [ ] **Step 1: Tulis test yang gagal**
 
@@ -2528,8 +2553,12 @@ final class ScanViewModel {
             try store.writeFieldImage(jpeg, fileName: fileName, for: session)
 
             let field = session.appendField(imageFileName: fileName)
-            try await store.save(session)
+            // Diantrekan sebelum disimpan: `enqueue` tidak melempar, jadi menaruhnya di sini
+            // menjamin lapang yang sudah dicatat pasti dianalisis. Kalau `save` yang gagal
+            // lebih dulu, lapang itu akan terjebak pending selamanya — gambarnya di disk,
+            // model menganggur, dan satu-satunya jalan keluar mengetik hitungannya manual.
             queue.enqueue(fieldID: field.id, imageData: jpeg, into: session)
+            try await store.save(session)
 
             scanLog.note("lapang \(field.index) direkam, \(jpeg.count) bita")
         } catch {
@@ -3222,11 +3251,19 @@ final class ReviewViewModel {
 
     /// Autosave setelah setiap perubahan. Kegagalannya dilaporkan tapi tidak membatalkan
     /// perubahan di memori — analis tetap melihat apa yang baru saja ia ketik.
+    ///
+    /// Sengaja tidak di-`await`: pengetikan tidak boleh menunggu disk. Aman tanpa kunci karena
+    /// setiap penulisan datang dari `@MainActor` yang sama dan membawa seluruh sesi, jadi
+    /// simpanan yang lebih baru menggantikan yang lama alih-alih merusaknya.
     private func persist() {
         Task { [weak self] in
             guard let self else { return }
             do {
                 try await self.store.save(self.session)
+                // Dibersihkan pada keberhasilan: tanpa ini satu kegagalan sesaat meninggalkan
+                // peringatan "gagal menyimpan" di layar selamanya, padahal setiap koreksi
+                // sesudahnya sudah tersimpan — dan analis tidak punya cara menutupnya.
+                self.errorMessage = nil
             } catch {
                 self.errorMessage = error.localizedDescription
             }
@@ -3243,7 +3280,7 @@ xcodebuild test -project Bacilab.xcodeproj -scheme Bacilab \
   -only-testing:BacilabTests/ReviewViewModelTests 2>&1 | tail -25
 ```
 
-Diharapkan: LULUS, 13 test.
+Diharapkan: LULUS, 12 test.
 
 - [ ] **Step 5: Commit**
 

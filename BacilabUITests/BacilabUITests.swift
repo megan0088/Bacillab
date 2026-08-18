@@ -1,29 +1,29 @@
 import XCTest
 
-/// Menelusuri alur baru dari ujung ke ujung: beranda → data pasien → sesi scan.
+/// Walks the flow end to end: home → patient data → scan session.
 ///
-/// Sengaja berhenti sebelum Review: review butuh lapang yang sudah dianalisis, dan
-/// menjalankan model sungguhan di UI test membuatnya lambat dan rapuh. Yang dijaga di sini
-/// adalah navigasinya — bahwa layar-layar itu tersambung dan judulnya benar.
+/// Deliberately stops before Review: reviewing needs analysed fields, and running the real
+/// models inside a UI test makes it slow and brittle. What this guards is the navigation —
+/// that the screens connect and are titled correctly.
 final class BacilabUITests: XCTestCase {
 
     override func setUpWithError() throws {
         continueAfterFailure = false
     }
 
-    /// The banner combines a title and a subtitle `Text` into one accessibility element, so
-    /// its label is "Analisis Baru, Mulai pemeriksaan BTA" rather than the bare title —
-    /// match on the prefix instead of the exact string.
-    private func tapAnalisisBaru(in app: XCUIApplication) {
+    /// The banner merges its title and subtitle `Text` into one accessibility element, so its
+    /// label is "New Analysis, Input patient" rather than the bare title — match on the prefix
+    /// instead of the exact string.
+    private func tapNewAnalysis(in app: XCUIApplication) {
         let banner = app.buttons
-            .matching(NSPredicate(format: "label BEGINSWITH %@", "Analisis Baru"))
+            .matching(NSPredicate(format: "label BEGINSWITH %@", "New Analysis"))
             .firstMatch
         XCTAssertTrue(banner.waitForExistence(timeout: 5))
         banner.tap()
     }
 
     @MainActor
-    func testBerandaMenampilkanJudulLab() throws {
+    func testHomeShowsLabTitle() throws {
         let app = XCUIApplication()
         app.launch()
 
@@ -32,34 +32,34 @@ final class BacilabUITests: XCTestCase {
     }
 
     @MainActor
-    func testAnalisisBaruMembukaFormDataPasien() throws {
+    func testNewAnalysisOpensPatientDataForm() throws {
         let app = XCUIApplication()
         app.launch()
 
-        tapAnalisisBaru(in: app)
+        tapNewAnalysis(in: app)
 
-        XCTAssertTrue(app.navigationBars["Data Pasien"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.navigationBars["Patient Data"].waitForExistence(timeout: 5))
     }
 
     @MainActor
-    func testKameraTerkunciSampaiDataWajibTerisi() throws {
+    func testCameraStaysLockedUntilRequiredFieldsAreFilled() throws {
         let app = XCUIApplication()
         app.launch()
 
-        tapAnalisisBaru(in: app)
-        XCTAssertTrue(app.navigationBars["Data Pasien"].waitForExistence(timeout: 5))
+        tapNewAnalysis(in: app)
+        XCTAssertTrue(app.navigationBars["Patient Data"].waitForExistence(timeout: 5))
 
-        let openCamera = app.buttons["Buka Kamera"]
+        let openCamera = app.buttons["Open Camera"]
         XCTAssertTrue(openCamera.exists)
         XCTAssertFalse(openCamera.isEnabled,
-                       "Sesi tidak boleh dimulai tanpa nama dan nomor rekam medis")
+                       "A session must not start without a name and a medical record number")
 
-        // Fill in the form's top-to-bottom order (No. Rekam Medis, then Nama Pasien): typing
-        // into the lower field first pulls it above the keyboard and scrolls the field above
-        // it off-screen, so the second tap never gets keyboard focus.
-        app.textFields["Contoh: RM 240724-001"].tap()
+        // Fill in the form's own top-to-bottom order (MRN, then Patient Name): typing into the
+        // lower field first lifts it above the keyboard and scrolls the field above it
+        // off-screen, so the second tap never receives focus.
+        app.textFields["Medical Record Number (MRN)"].tap()
         app.typeText("RM 240724-001")
-        app.textFields["Masukkan nama lengkap"].tap()
+        app.textFields["Patient Name"].tap()
         app.typeText("Ahmad Rizki")
 
         XCTAssertTrue(openCamera.isEnabled)

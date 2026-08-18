@@ -194,13 +194,13 @@ enum CameraError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .permissionDenied:
-            return "Izin kamera ditolak. Aktifkan di Pengaturan untuk memindai preparat."
+            return "Camera access was denied. Enable it in Settings to scan slides."
         case .deviceUnavailable:
-            return "Kamera tidak tersedia pada perangkat ini."
+            return "No camera is available on this device."
         case .sessionNotRunning:
-            return "Kamera belum siap. Coba tutup dan buka kembali layar pengambilan gambar."
+            return "The camera is not ready. Close the capture screen and open it again."
         case .captureFailed:
-            return "Gagal mengambil gambar preparat. Silakan coba lagi."
+            return "The slide image could not be captured. Please try again."
         }
     }
 }

@@ -15,9 +15,9 @@ enum SessionDisplayStatus: Hashable, Sendable {
 
     var label: String {
         switch self {
-        case .running:  return "Berjalan"
-        case .negative: return "Negatif"
-        case .positive: return "Positif"
+        case .running:  return "In progress"
+        case .negative: return "Negative"
+        case .positive: return "Positive"
         }
     }
 }
@@ -76,8 +76,8 @@ final class ExamSession: Identifiable {
     /// `btaCount > 0`, sehingga lapang kosong tidak pernah masuk penyebut dan grade Negatif
     /// secara struktural tidak bisa dicapai.
     @discardableResult
-    func appendField(imageFileName: String) -> FieldRecord {
-        let field = FieldRecord(index: fields.count, imageFileName: imageFileName)
+    func appendField(imageFileName: String, source: FieldSource = .camera) -> FieldRecord {
+        let field = FieldRecord(index: fields.count, imageFileName: imageFileName, source: source)
         fields.append(field)
         return field
     }
@@ -135,6 +135,13 @@ final class ExamSession: Identifiable {
     var pendingAnalysisCount: Int { fields.filter(\.isPending).count }
 
     var fieldsNeedingManualCount: [FieldRecord] { fields.filter(\.needsManualCount) }
+
+    /// How many counted fields came from imported photos rather than the eyepiece.
+    ///
+    /// Surfaced so a mixed session declares itself: a slide read partly from the microscope and
+    /// partly from imported images is two acquisitions pooled into one grade, and a reader of
+    /// the result sheet has no other way to tell.
+    var importedFieldCount: Int { countedFields.filter { $0.source == .gallery }.count }
 
     var displayStatus: SessionDisplayStatus {
         switch status {

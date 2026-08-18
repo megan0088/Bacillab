@@ -145,7 +145,7 @@ struct AnalysisResult: Hashable, Sendable {
 }
 
 enum BTAGrade: String, Hashable, CaseIterable, Sendable, Codable {
-    case negative = "Negatif"
+    case negative = "Negative"
     case scanty   = "Scanty"
     case plus1    = "1+"
     case plus2    = "2+"

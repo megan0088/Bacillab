@@ -15,7 +15,8 @@ struct DualDetectorTests {
         return try Data(contentsOf: url)
     }
 
-    @Test("Kedua model membaca lapang yang sama dan keduanya terlaporkan")
+    @Test("Kedua model membaca lapang yang sama dan keduanya terlaporkan",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func bothDetectorsReport() async throws {
         let result = try await MultiDetectorService().analyze(imageData: probeImageData())
 
@@ -28,7 +29,8 @@ struct DualDetectorTests {
                 "Salah satu model tidak mendeteksi apa pun; perbandingan jadi hampa")
     }
 
-    @Test("Hitungan yang dilaporkan milik ResNet, bukan campuran keduanya")
+    @Test("Hitungan yang dilaporkan milik ResNet, bukan campuran keduanya",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func primaryCountIsResNetAlone() async throws {
         let result = try await MultiDetectorService().analyze(imageData: probeImageData())
 
@@ -59,7 +61,8 @@ struct DualDetectorTests {
                 "Grade tidak konsisten dengan hitungan ResNet")
     }
 
-    @Test("Memilih satu model hanya menjalankan model itu")
+    @Test("Memilih satu model hanya menjalankan model itu",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func singleSelectionRunsOnlyThatModel() async throws {
         let data = try probeImageData()
         let service = MultiDetectorService()
@@ -75,7 +78,8 @@ struct DualDetectorTests {
         #expect(yoloOnly.reading(.resnet) == nil, "ResNet ikut jalan padahal tidak dipilih")
     }
 
-    @Test("Memilih YOLO membuat grade mengikuti YOLO, bukan ResNet")
+    @Test("Memilih YOLO membuat grade mengikuti YOLO, bukan ResNet",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func yoloSelectionGradesFromYolo() async throws {
         let data = try probeImageData()
         let service = MultiDetectorService()
@@ -93,7 +97,8 @@ struct DualDetectorTests {
                 "Pilihan model tidak mengubah hitungan — kemungkinan selection diabaikan")
     }
 
-    @Test("Setiap model membawa kotaknya sendiri untuk digambar")
+    @Test("Setiap model membawa kotaknya sendiri untuk digambar",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func eachReadingCarriesItsOwnBoxes() async throws {
         let result = try await MultiDetectorService().analyze(imageData: probeImageData(), using: .all)
 

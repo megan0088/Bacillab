@@ -65,28 +65,28 @@ struct ReviewView: View {
             )
             .presentationDetents([.medium])
         }
-        .alert("Masih ada lapang tanpa hitungan", isPresented: $showUnresolvedWarning) {
-            Button("Terbitkan Saja", role: .destructive) { publish() }
-            Button("Periksa Dulu", role: .cancel) {}
+        .alert("Some fields have no count", isPresented: $showUnresolvedWarning) {
+            Button("Publish Anyway", role: .destructive) { publish() }
+            Button("Check First", role: .cancel) {}
         } message: {
-            Text("\(viewModel.unresolvedFields.count) lapang belum punya angka dan tidak ikut "
-                 + "dihitung — baik pembilang maupun penyebutnya. Isi lewat keypad, atau buang "
-                 + "lapangnya, supaya hasilnya mewakili apa yang benar-benar dibaca.")
+            Text("\(viewModel.unresolvedFields.count) fields have no number yet and count "
+                 + "towards neither the total nor the denominator. Enter them on the keypad, or "
+                 + "discard them, so the result reflects what was actually read.")
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .alert("Something went wrong", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
     }
 
-    // MARK: - Antrean
+    // MARK: - Queue
 
     private var analysisProgress: some View {
         HStack(spacing: 10) {
             ProgressView()
-            Text("Menganalisis \(session.fields.count - viewModel.queue.remaining) "
-                 + "dari \(session.fields.count) lapang…")
+            Text("Analysing \(session.fields.count - viewModel.queue.remaining) "
+                 + "of \(session.fields.count) fields…")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -156,20 +156,20 @@ struct ReviewView: View {
     private var confidenceLine: some View {
         if let field = viewModel.selectedField {
             if field.correctedCount != nil {
-                Label("Dikoreksi analis", systemImage: "hand.raised.fill")
+                Label("Corrected by analyst", systemImage: "hand.raised.fill")
                     .font(.caption)
                     .foregroundStyle(Color.accentColor)
             } else if field.analysis == nil {
-                Text("Menunggu analisis…")
+                Text("Waiting for analysis…")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             } else if field.effectiveCount == nil {
-                Label("Model gagal membaca lapang ini — isi manual",
+                Label("The model could not read this field — enter it manually",
                       systemImage: "exclamationmark.triangle.fill")
                     .font(.caption)
                     .foregroundStyle(.orange)
             } else if let confidence = field.analysis?.confidence {
-                Text("Model yakin \(Int((confidence * 100).rounded()))% atas basil yang ia tandai")
+                Text("Model is \(Int((confidence * 100).rounded()))% confident in the bacilli it marked")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -191,7 +191,7 @@ struct ReviewView: View {
                 viewModel.toggleExcludedOnSelected()
             } label: {
                 Label(
-                    viewModel.selectedField?.isExcluded == true ? "Pakai Lagi" : "Buang Lapang",
+                    viewModel.selectedField?.isExcluded == true ? "Use Again" : "Discard Field",
                     systemImage: viewModel.selectedField?.isExcluded == true
                         ? "arrow.uturn.backward" : "trash"
                 )
@@ -204,7 +204,7 @@ struct ReviewView: View {
             Button {
                 viewModel.selectNext()
             } label: {
-                Text("Simpan & Lanjut")
+                Text("Save & Next")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 10))
@@ -219,11 +219,11 @@ struct ReviewView: View {
 
     private var totalsSection: some View {
         HStack(spacing: 0) {
-            statCell(label: "Lapang Terbaca", value: "\(session.examinedFieldCount)")
+            statCell(label: "Fields Read", value: "\(session.examinedFieldCount)")
             Divider().frame(height: 44)
             statCell(label: "Total BTA", value: "\(session.totalBTA)")
             Divider().frame(height: 44)
-            statCell(label: "Usulan Model", value: session.suggestedGrade.rawValue)
+            statCell(label: "Model Suggests", value: session.suggestedGrade.rawValue)
         }
         .padding(.vertical, 14)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -246,7 +246,7 @@ struct ReviewView: View {
 
     private var gradeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tentukan Grade")
+            Text("Set Grade")
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
 
             ScrollView(.horizontal, showsIndicators: false) {
@@ -277,13 +277,13 @@ struct ReviewView: View {
         .padding(.horizontal, 20)
     }
 
-    /// Di bawah ambang WHO/IUATLD grade ini belum boleh berdiri sebagai laporan.
+    /// Below the WHO/IUATLD threshold this grade may not stand as a report.
     private var provisionalNotice: some View {
         VStack(alignment: .leading, spacing: 10) {
             Label(
-                "\(session.reportedGrade.rawValue) memerlukan \(session.reportedGrade.minimumFields) "
-                + "lapang (WHO/IUATLD). Kurang \(session.fieldsRemainingForGrade) lapang lagi — "
-                + "hasil akan bercap SEMENTARA.",
+                "\(session.reportedGrade.rawValue) needs \(session.reportedGrade.minimumFields) "
+                + "fields (WHO/IUATLD). \(session.fieldsRemainingForGrade) more to go — "
+                + "the result will be stamped PROVISIONAL.",
                 systemImage: "exclamationmark.circle.fill"
             )
             .font(.caption)
@@ -294,7 +294,7 @@ struct ReviewView: View {
                 session.status = .scanning
                 dismiss()
             } label: {
-                Label("Lanjut Scan", systemImage: "camera.fill")
+                Label("Continue Scanning", systemImage: "camera.fill")
                     .font(.caption.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
@@ -307,7 +307,7 @@ struct ReviewView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Catatan Laboratorium")
+            Text("Laboratory Notes")
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
 
             TextEditor(text: Bindable(session).notes)
@@ -332,7 +332,7 @@ struct ReviewView: View {
         } label: {
             HStack {
                 if viewModel.isPublishing { ProgressView().tint(.white) }
-                Text("Terbitkan Hasil")
+                Text("Publish Result")
                     .font(.system(.body, design: .rounded, weight: .semibold))
             }
             .frame(maxWidth: .infinity)

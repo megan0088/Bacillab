@@ -74,7 +74,8 @@ struct YOLO11DetectorTests {
         }
     }
 
-    @Test("Ketiga model membaca lapang yang sama dan semuanya terlaporkan")
+    @Test("Ketiga model membaca lapang yang sama dan semuanya terlaporkan",
+          .disabled("YOLOv8 dimatikan di MultiDetectorService — hidupkan keduanya bersamaan"))
     func allThreeReport() async throws {
         let result = try await MultiDetectorService().analyze(imageData: probeImageData(), using: .all)
 

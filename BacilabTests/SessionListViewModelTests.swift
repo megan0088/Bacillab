@@ -53,8 +53,8 @@ struct SessionListViewModelTests {
                 "Chip Berjalan harus bisa terisi — yang lama tidak pernah bisa")
     }
 
-    @Test("Filter status menyaring daftar")
-    func statusFilterWorks() async {
+    @Test("Tanpa kata kunci, seluruh sesi tampil")
+    func emptySearchShowsEverything() async {
         let store = StubStore()
         store.sessions = [
             session(name: "A", mrn: "RM-1", status: .scanning),
@@ -64,34 +64,36 @@ struct SessionListViewModelTests {
         let vm = SampleListViewModel(sessionStore: store)
         await vm.load()
 
-        vm.statusFilter = .running
-        #expect(vm.filteredSessions.count == 1)
+        #expect(vm.filteredSessions.count == 3)
 
-        vm.statusFilter = .negative
-        #expect(vm.filteredSessions.map(\.patient.name) == ["B"])
-
-        vm.statusFilter = .positive
-        #expect(vm.filteredSessions.map(\.patient.name) == ["C"])
-
-        vm.statusFilter = nil
+        // Spasi saja bukan kata kunci — kalau ia menyaring, daftar mendadak kosong tanpa
+        // sebab yang terlihat.
+        vm.searchText = "   "
         #expect(vm.filteredSessions.count == 3)
     }
 
-    @Test("Pencarian cocok pada nama maupun nomor rekam medis")
-    func searchMatchesNameAndMRN() async {
+    @Test("Pencarian cocok pada NIK, nomor rekam medis, maupun nama")
+    func searchMatchesIDCardMRNAndName() async {
         let store = StubStore()
-        store.sessions = [
-            session(name: "Ahmad Rizki", mrn: "RM 240724-001", status: .published),
-            session(name: "Siti Rahma", mrn: "RM 240724-002", status: .published)
-        ]
+        let ahmad = session(name: "Ahmad Rizki", mrn: "RM 240724-001", status: .published)
+        ahmad.patient.nationalID = "3204012509900001"
+        let siti = session(name: "Siti Rahma", mrn: "RM 240724-002", status: .published)
+        siti.patient.nationalID = "3204014403950002"
+        store.sessions = [ahmad, siti]
+
         let vm = SampleListViewModel(sessionStore: store)
         await vm.load()
 
-        vm.searchText = "ahmad"
-        #expect(vm.filteredSessions.count == 1)
-
-        vm.searchText = "240724-002"
+        // Kolomnya berlabel nomor KTP, jadi ini yang paling utama harus cocok.
+        vm.searchText = "3204014403950002"
         #expect(vm.filteredSessions.map(\.patient.name) == ["Siti Rahma"])
+
+        vm.searchText = "240724-001"
+        #expect(vm.filteredSessions.map(\.patient.name) == ["Ahmad Rizki"])
+
+        vm.searchText = "ahmad"
+        #expect(vm.filteredSessions.count == 1,
+                "Mengetik nama harus tetap menemukan — kalau tidak, petugas mengira datanya hilang")
     }
 
     @Test("Menghapus sesi juga menghapusnya dari daftar")

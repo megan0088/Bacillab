@@ -21,7 +21,7 @@ struct ResultSheetView: View {
 
     private var gradeLabel: String {
         switch grade {
-        case .negative: return "Negatif"
+        case .negative: return "Negative"
         case .scanty:   return "Scanty (Borderline)"
         case .plus1:    return "Positif (1+)"
         case .plus2:    return "Positif (2+)"
@@ -50,7 +50,7 @@ struct ResultSheetView: View {
             .padding(20)
         }
         .background(Color(.systemGroupedBackground))
-        .navigationTitle("Lembar Hasil")
+        .navigationTitle("Result Sheet")
         .navigationBarTitleDisplayMode(.inline)
     }
 
@@ -58,7 +58,7 @@ struct ResultSheetView: View {
 
     private var patientSection: some View {
         VStack(alignment: .leading, spacing: 0) {
-            Text("Informasi Pasien")
+            Text("Patient Information")
                 .font(.system(.caption, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
                 .padding(.bottom, 12)
@@ -105,11 +105,11 @@ struct ResultSheetView: View {
 
     private var resultSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Hasil")
+            Text("Result")
                 .font(.system(.caption, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
 
-            Label("Analisis AI bukan diagnosis medis", systemImage: "exclamationmark.triangle.fill")
+            Label("AI analysis is not a medical diagnosis", systemImage: "exclamationmark.triangle.fill")
                 .font(.caption)
                 .foregroundStyle(.orange)
 
@@ -122,7 +122,7 @@ struct ResultSheetView: View {
                         .font(.system(.title2, design: .rounded, weight: .black))
                     Spacer()
                     if !session.isGradeConfirmed {
-                        Text("SEMENTARA")
+                        Text("PROVISIONAL")
                             .font(.system(size: 10, weight: .heavy, design: .rounded))
                             .padding(.horizontal, 7)
                             .padding(.vertical, 3)
@@ -158,11 +158,11 @@ struct ResultSheetView: View {
 
     private var statsSection: some View {
         HStack(spacing: 0) {
-            statCell(icon: "scope", label: "Lapang Terbaca", value: "\(session.examinedFieldCount)")
+            statCell(icon: "scope", label: "Fields Read", value: "\(session.examinedFieldCount)")
             Divider().frame(height: 56)
             statCell(icon: "microbe.fill", label: "Total BTA", value: "\(session.totalBTA)")
             Divider().frame(height: 56)
-            statCell(icon: "hand.raised.fill", label: "Dikoreksi Analis",
+            statCell(icon: "hand.raised.fill", label: "Analyst Corrections",
                      value: "\(session.fields.filter { $0.correctedCount != nil }.count)")
         }
         .padding(16)
@@ -188,7 +188,7 @@ struct ResultSheetView: View {
 
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Catatan Laboratorium")
+            Text("Laboratory Notes")
                 .font(.system(.caption, design: .rounded, weight: .semibold))
                 .foregroundStyle(Color.accentColor)
             Text(session.notes)

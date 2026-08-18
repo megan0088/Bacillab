@@ -1,15 +1,18 @@
+import PhotosUI
 import SwiftUI
 
-/// Sesi scan. Menghasilkan lapang, dan tidak tahu apa-apa tentang BTA.
+/// The scan session. Produces fields, and knows nothing about BTA.
 ///
-/// Kekosongan layar ini disengaja: teknisi sedang menempel di okuler, bukan menatap layar.
-/// Hitungan, grade, perbandingan model, dan confidence semuanya ada di Review, tempat ia
-/// sudah duduk dan sedang memutuskan.
+/// This screen is deliberately bare: the technician is at the eyepiece, not watching the phone.
+/// Counts, grade, model comparison and confidence all live in Review, where they are sitting
+/// down and deciding.
 struct ScanView: View {
     @Bindable var session: ExamSession
     @State private var viewModel: ScanViewModel
     let dependencies: AppDependencies
     @State private var goToReview = false
+    @State private var pickedPhoto: PhotosPickerItem?
+    @State private var isImporting = false
 
     init(session: ExamSession, dependencies: AppDependencies) {
         self.session = session
@@ -38,36 +41,54 @@ struct ScanView: View {
         }
         .background(Color(.systemBackground))
         .ignoresSafeArea(edges: .bottom)
-        .navigationTitle("Sesi Pemeriksaan")
+        .navigationTitle("Scan Session")
         .navigationBarTitleDisplayMode(.inline)
         .navigationDestination(isPresented: $goToReview) {
             ReviewView(session: session, queue: viewModel.queue, dependencies: dependencies)
         }
-        .alert("Error", isPresented: .constant(viewModel.errorMessage != nil)) {
+        .alert("Something went wrong", isPresented: .constant(viewModel.errorMessage != nil)) {
             Button("OK") { viewModel.errorMessage = nil }
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
-        .alert("Izin Kamera Diperlukan", isPresented: $viewModel.permissionDenied) {
-            Button("Buka Pengaturan") {
+        .alert("Camera access needed", isPresented: $viewModel.permissionDenied) {
+            Button("Open Settings") {
                 if let url = URL(string: UIApplication.openSettingsURLString) {
                     UIApplication.shared.open(url)
                 }
             }
-            Button("Batal", role: .cancel) {}
+            Button("Cancel", role: .cancel) {}
         } message: {
-            Text("Aplikasi tidak dapat mengakses kamera untuk memindai preparat. "
-                 + "Aktifkan izin kamera di Pengaturan, lalu buka kembali layar ini.")
+            Text("The app cannot reach the camera to scan the slide. "
+                 + "Enable camera access in Settings, then open this screen again.")
+        }
+        .onChange(of: pickedPhoto) { _, item in
+            guard let item else { return }
+            isImporting = true
+            Task {
+                defer {
+                    isImporting = false
+                    pickedPhoto = nil
+                }
+                // Importing while the scan loop is running would interleave two sources into
+                // one field sequence, so stop it first and let the analyst restart deliberately.
+                viewModel.stopScan()
+                guard let data = try? await item.loadTransferable(type: Data.self) else {
+                    viewModel.errorMessage = "That photo could not be loaded."
+                    return
+                }
+                await viewModel.importField(from: data, into: session)
+            }
         }
         .task { await viewModel.startCamera() }
         .onDisappear { viewModel.stopCamera() }
     }
 
-    // MARK: - Bagian
+    // MARK: - Sections
 
     private var fieldCounter: some View {
         VStack(spacing: 4) {
-            Text("\(session.fields.count) dari \(ExamSession.batchTarget) lapang")
+            Text("\(session.fields.count) of \(ExamSession.batchTarget) fields")
                 .font(.system(.subheadline, design: .rounded, weight: .semibold))
                 .contentTransition(.numericText())
 
@@ -83,12 +104,12 @@ struct ScanView: View {
         .background(Color(.systemGray6))
     }
 
-    /// Kotak, bukan lingkaran.
+    /// Square, not a circle.
     ///
-    /// Preview layer memakai `resizeAspectFill`, jadi kotak ini persis crop yang diterima
-    /// model. Lingkaran putus-putus di dalamnya hanya panduan mengarahkan okuler — ia tidak
-    /// memotong apa pun. Masker lingkaran akan menyembunyikan sudut-sudut kotak ini (sekitar
-    /// 21% luasnya), padahal area itu tetap dibaca dan dihitung model.
+    /// The preview layer is `resizeAspectFill`, so this square is exactly the crop the models
+    /// receive. The dashed circle inside it is only a guide for aiming the eyepiece — it clips
+    /// nothing. A circular *mask* would hide this square's corners, roughly 21% of its area,
+    /// which the models still read and still count.
     private func viewfinder(side: CGFloat) -> some View {
         ZStack {
             #if targetEnvironment(simulator)
@@ -120,10 +141,10 @@ struct ScanView: View {
     private var focusBadge: some View {
         Group {
             if viewModel.isBlurry {
-                Label("Fokus belum tajam", systemImage: "exclamationmark.triangle.fill")
+                Label("Focus not sharp", systemImage: "exclamationmark.triangle.fill")
                     .foregroundStyle(.orange)
             } else {
-                Label("Fokus tajam", systemImage: "checkmark.circle")
+                Label("Focus sharp", systemImage: "checkmark.circle")
                     .foregroundStyle(.secondary)
             }
         }
@@ -150,9 +171,24 @@ struct ScanView: View {
                 }
             }
 
-            Text(viewModel.isScanning ? "Ketuk untuk berhenti" : "Mulai Scan")
+            Text(viewModel.isScanning ? "Tap to stop" : "Start Scan")
                 .font(.caption2.weight(.semibold))
                 .foregroundStyle(.secondary)
+
+            // Importing a photo is the only way to exercise detection without a microscope
+            // clamped to the phone, so it sits beside the shutter rather than being buried.
+            PhotosPicker(selection: $pickedPhoto, matching: .images) {
+                Label(
+                    isImporting ? "Importing…" : "Import Photo",
+                    systemImage: isImporting ? "hourglass" : "photo.on.rectangle.angled"
+                )
+                .font(.caption.weight(.medium))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 18)
+                .padding(.vertical, 9)
+                .background(Color.accentColor.opacity(0.12), in: Capsule())
+            }
+            .disabled(isImporting)
 
             if !session.fields.isEmpty {
                 Button {
@@ -160,7 +196,7 @@ struct ScanView: View {
                     session.status = .reviewing
                     goToReview = true
                 } label: {
-                    Text("Selesai · Lanjut ke Review")
+                    Text("Done · Go to Review")
                         .font(.system(.subheadline, design: .rounded, weight: .semibold))
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 13)
@@ -174,13 +210,13 @@ struct ScanView: View {
     }
 }
 
-#Preview("Sesi – belum ada lapang") {
+#Preview("Scan – no fields yet") {
     NavigationStack {
         ScanView(session: ExamSession(), dependencies: AppDependencies())
     }
 }
 
-#Preview("Sesi – 8 lapang") {
+#Preview("Scan – 8 fields") {
     let session = ExamSession()
     for _ in 0..<8 { session.appendField(imageFileName: "f.jpg") }
     return NavigationStack {

@@ -16,11 +16,11 @@ enum AnalysisError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidImage:
-            return "Gambar tidak valid atau tidak dapat diproses."
+            return "The image is invalid or could not be processed."
         case .modelUnavailable:
-            return "Model deteksi BTA tidak dapat dimuat. Hitungan tidak bisa dilakukan."
+            return "The BTA detection model could not be loaded, so no count can be produced."
         case .inferenceFailure(let msg):
-            return "Gagal menjalankan deteksi: \(msg)"
+            return "Detection failed to run: \(msg)"
         }
     }
 }
