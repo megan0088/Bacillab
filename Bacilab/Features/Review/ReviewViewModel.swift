@@ -153,6 +153,31 @@ final class ReviewViewModel {
 
     // MARK: - Gambar
 
+    /// Queues every field that still has no analysis.
+    ///
+    /// Two situations reach this screen looking identical: a session resumed after the app was
+    /// killed while the queue was still draining, and a seeded demo session whose fields were
+    /// never analysed at all. In both, the images are on disk and the models are idle, but
+    /// nothing would otherwise enqueue them — the queue only ever receives what `ScanViewModel`
+    /// captures live. Without this those fields sit `pending` forever and quietly sit outside
+    /// both the numerator and the denominator.
+    ///
+    /// Safe to call repeatedly: a field stops being `isPending` the moment its analysis lands,
+    /// and the queue is per-session, so nothing is enqueued twice within one visit.
+    func analysePendingFields() {
+        let pending = session.fields.filter(\.isPending)
+        guard !pending.isEmpty else { return }
+
+        for field in pending {
+            guard let data = imageData(for: field) else {
+                reviewLog.error("Field \(field.index) has no image on disk; cannot analyse it")
+                continue
+            }
+            queue.enqueue(fieldID: field.id, imageData: data, into: session)
+        }
+        reviewLog.note("Queued \(pending.count) unanalysed field(s)")
+    }
+
     func imageData(for field: FieldRecord) -> Data? {
         try? Data(contentsOf: store.fieldImageURL(fileName: field.imageFileName, for: session))
     }

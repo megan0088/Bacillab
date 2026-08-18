@@ -78,6 +78,9 @@ struct ReviewView: View {
         } message: {
             Text(viewModel.errorMessage ?? "")
         }
+        // Picks up fields the queue never got to — a session resumed after the app was killed,
+        // or a seeded one that arrived unanalysed.
+        .task { viewModel.analysePendingFields() }
     }
 
     // MARK: - Queue

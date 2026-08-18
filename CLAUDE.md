@@ -51,6 +51,42 @@ is rewritten after every recorded or analysed field, so a session survives the a
 `FieldRecord.imageFileName` is relative, never an absolute URL: iOS container paths change
 between installs.
 
+### Fields can come from the photo library, and say so
+`ScanView` offers **Import Photo** beside the shutter. Without it the live camera is the only
+image source, so detection cannot be exercised at all unless a microscope is clamped to the
+phone — which is what makes the app testable off a rig.
+
+Camera and gallery share one path (`ScanViewModel.record`): same framing, same write-then-append
+order, same queue. Duplicating that pipeline would make any difference between an imported field
+and a captured one part framing and part source, with no way to separate them. The focus check
+runs for the camera only — telling someone an imported photo is "out of focus" is advice about an
+eyepiece nobody is looking through.
+
+Each field records its `FieldSource`, and `ExamSession.importedFieldCount` surfaces the mix: a
+slide read partly through the eyepiece and partly from imported images is two acquisitions pooled
+into one grade, and a reader of the result sheet has no other way to tell.
+
+### Unanalysed fields are re-queued on entering Review
+`ReviewViewModel.analysePendingFields()` enqueues every field whose `analysis` is still nil.
+Two situations arrive looking identical — a session resumed after the app was killed mid-queue,
+and a seeded demo session that was never analysed. In both the images are on disk and the models
+are idle, but the queue only ever receives what `ScanViewModel` captures live, so without this
+those fields stay `pending` forever and sit outside both the numerator and the denominator.
+
+### Demo seeding — images only, never readings
+`DemoSeeder` fills an **empty** history with one 20-field session from tiles bundled in
+`Resources/DemoFields/`, so an exhibition build has something to show. `ElectraLabApp` opts in via
+`SampleListViewModel(seedsDemoData: true)`; the default is off so tests get exactly what they set up.
+
+It seeds **images, not counts.** The source tiles ship with ground-truth annotations, and planting
+those would make a session look instantly analysed while putting numbers on screen that no model
+produced. The seeded fields arrive unanalysed and the real models count them.
+
+The tiles come from the detector's own **test** split (`AI TBC/output/TestingData`) — never the
+training split, which the model memorised. Even so this flatters it: same source, same phone-camera
+dataset, so a demo shows the model at its best rather than its behaviour on this lab's slides.
+Patient names are prefixed `DEMO —` so nobody mistakes seeded data for a record.
+
 ### Grading is gated by field count — WHO/IUATLD
 `BTAGrade.minimumFields`: 3+ needs 20 fields, 2+ needs 50, and 1+/Scanty/**Negatif need the full
 100**. The asymmetry is deliberate: a heavy smear declares itself quickly, but calling a slide
@@ -125,17 +161,27 @@ Bacilab/Bacilab/
     └── ResultSheet/  # Read-only published result; also reached by tapping a sample in history
 ```
 
-## Three detectors, compared on the same field
-Every field is read by all three models; only one of them ever grades:
+## Detectors, compared on the same field
+Every field is read by every **enabled** model; only one of them ever grades:
 
 | | |
 |---|---|
 | `ResNetAnalysisService` | `BTADetector.onnx`, Faster R-CNN, ONNX Runtime. The grading model. |
-| `YOLOAnalysisService` | `BTADetector.mlmodelc`, YOLOv8s-OBB, CoreML. Comparison only. |
+| `YOLOAnalysisService` | `BTADetector.mlmodelc`, YOLOv8s-OBB, CoreML. **Currently switched off** — see below. |
 | `YOLO11AnalysisService` | YOLO11 end-to-end, CoreML. Comparison only. |
-| `MultiDetectorService` | Runs all three concurrently, over identical bytes. |
+| `MultiDetectorService` | Runs the enabled models concurrently, over identical bytes. |
 
-`FieldFraming` exists so all three get **byte-identical** input. Duplicate the crop into any
+### YOLOv8 is switched off, not removed
+Only ResNet and YOLO11 currently ship. `MultiDetectorService`'s default detector dictionary has
+the `.yolo` entry commented out; `DetectorKind.yolo`, `YOLOAnalysisService` and the bundled
+`BTADetector.mlmodelc` are all untouched. `analyze` filters on `detectors[$0] != nil`, so an
+absent entry is simply not run and nothing else needs to know — and sessions already saved with
+YOLOv8 readings still decode. Turning it back on is uncommenting one line.
+
+Six tests that assume YOLOv8 participates carry `.disabled("YOLOv8 dimatikan …")` rather than
+being deleted, so they still compile against the current API and come back with the model.
+
+`FieldFraming` exists so every model gets **byte-identical** input. Duplicate the crop into any
 service and any difference in counts becomes part framing and part model, inseparably.
 
 **ResNet is unconditionally the grading detector — `FieldAnalysisQueue` hardcodes it.** There is
@@ -260,4 +306,13 @@ Grading is computed via `BTAGrade.grade(for: totalBTA, across: fields)`:
 - Do not use `.environment(deps)` as a substitute for explicit injection in the capture flow
 
 ## Localization
-UI text is in **Bahasa Indonesia**. Keep all user-facing strings in Indonesian.
+UI text is in **English**. Keep all user-facing strings in English — including error messages
+from `CameraError` and `AnalysisError`, which surface in alerts.
+
+This reversed an earlier rule: the app's copy was Bahasa Indonesia until the 2026-08-18 sweep.
+Test names in `BacilabTests` are still Indonesian; they are not user-facing and were left alone.
+
+`BTAGrade.rawValue` doubles as UI text **and** as the storage key in `manifest.json`. Renaming a
+case breaks every session already on disk — `SessionStore` skips manifests it cannot decode, so
+they vanish from the list rather than crashing. Acceptable pre-release; if real readings ever
+exist, split the display name from the raw value before touching these.

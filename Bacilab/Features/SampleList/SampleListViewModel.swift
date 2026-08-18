@@ -12,15 +12,30 @@ final class SampleListViewModel {
 
     var searchText = ""
 
-    init(sessionStore: any SessionStoreProtocol) {
+    /// Whether an empty history should be filled with demo data.
+    ///
+    /// Off by default so tests get exactly the sessions they set up. `ElectraLabApp` turns it on.
+    private let seedsDemoData: Bool
+
+    init(sessionStore: any SessionStoreProtocol, seedsDemoData: Bool = false) {
         self.sessionStore = sessionStore
+        self.seedsDemoData = seedsDemoData
     }
 
     func load() async {
         isLoading = true
         defer { isLoading = false }
         do {
-            sessions = try await sessionStore.allSessions()
+            var loaded = try await sessionStore.allSessions()
+
+            // Seeding is guarded on an empty history inside `DemoSeeder` too, so this can never
+            // add demo data on top of real work.
+            if seedsDemoData, loaded.isEmpty {
+                await DemoSeeder.seedIfEmpty(store: sessionStore)
+                loaded = try await sessionStore.allSessions()
+            }
+
+            sessions = loaded
         } catch {
             errorMessage = error.localizedDescription
         }
