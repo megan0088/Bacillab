@@ -18,14 +18,19 @@ struct SampleListView: View {
                     sessionsSection
                 }
                 .padding(.horizontal, 20)
-                .padding(.bottom, 100)
+                .padding(.bottom, 24)
             }
             .ignoresSafeArea(edges: .top)
             .background(Color(.systemGroupedBackground))
-            // Search floats over the bottom of the list rather than sitting above it: the
-            // history is what the technician came for, and the search is what they reach for
-            // only when it is long. The "+" lives in the banner, so there is no separate FAB.
-            .overlay(alignment: .bottom) { searchBar }
+            // Search sits at the bottom of the list rather than above it: the history is what
+            // the technician came for, and search is what they reach for only when it is long.
+            // The "+" lives in the banner, so there is no separate FAB.
+            //
+            // `safeAreaInset` rather than `.overlay`: it insets the scroll content by the bar's
+            // own height, so the bar can never cover a row. As an overlay it did — with the
+            // vertical space of a landscape screen, the one seeded session sat underneath it and
+            // read as an empty history.
+            .safeAreaInset(edge: .bottom) { searchBar }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ExamSession.self) { session in
                 destination(for: session)
