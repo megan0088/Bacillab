@@ -32,34 +32,46 @@ enum FocusMetric {
         let side = workingSide
         var pixels = [UInt8](repeating: 0, count: side * side)
 
-        guard let context = CGContext(
-            data: &pixels,
-            width: side,
-            height: side,
-            bitsPerComponent: 8,
-            bytesPerRow: side,
-            space: CGColorSpaceCreateDeviceGray(),
-            bitmapInfo: CGImageAlphaInfo.none.rawValue
-        ) else { return 0 }
+        // The context is created, drawn into, and read entirely inside this closure.
+        //
+        // Passing `&pixels` straight to `CGContext(data:)` hands it a pointer that is only
+        // guaranteed valid for the duration of that one call, while the context holds it for its
+        // whole lifetime and `draw` writes through it afterwards. That is undefined behaviour —
+        // it merely tends to look correct because the array's storage happens not to move, and
+        // it is exactly the shape Xcode's Exclusive Access to Memory checking traps at runtime.
+        return pixels.withUnsafeMutableBytes { raw -> Double in
+            guard let base = raw.baseAddress,
+                  let context = CGContext(
+                      data: base,
+                      width: side,
+                      height: side,
+                      bitsPerComponent: 8,
+                      bytesPerRow: side,
+                      space: CGColorSpaceCreateDeviceGray(),
+                      bitmapInfo: CGImageAlphaInfo.none.rawValue
+                  )
+            else { return 0 }
 
-        context.interpolationQuality = .low
-        context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
+            context.interpolationQuality = .low
+            context.draw(image, in: CGRect(x: 0, y: 0, width: side, height: side))
 
-        // Rata-rata kuadrat gradien, horizontal dan vertikal. Dinormalisasi ke [0, 1] supaya
-        // ambangnya tidak bergantung pada kedalaman bit.
-        var total = 0.0
-        var samples = 0
-        for y in 0..<(side - 1) {
-            for x in 0..<(side - 1) {
-                let i = y * side + x
-                let dx = Double(pixels[i + 1]) - Double(pixels[i])
-                let dy = Double(pixels[i + side]) - Double(pixels[i])
-                total += (dx * dx + dy * dy) / (255.0 * 255.0)
-                samples += 1
+            // Mean squared gradient, horizontal and vertical, normalised to [0, 1] so the
+            // threshold does not depend on bit depth.
+            let bytes = raw.bindMemory(to: UInt8.self)
+            var total = 0.0
+            var samples = 0
+            for y in 0..<(side - 1) {
+                for x in 0..<(side - 1) {
+                    let i = y * side + x
+                    let dx = Double(bytes[i + 1]) - Double(bytes[i])
+                    let dy = Double(bytes[i + side]) - Double(bytes[i])
+                    total += (dx * dx + dy * dy) / (255.0 * 255.0)
+                    samples += 1
+                }
             }
-        }
 
-        guard samples > 0 else { return 0 }
-        return total / Double(samples)
+            guard samples > 0 else { return 0 }
+            return total / Double(samples)
+        }
     }
 }
