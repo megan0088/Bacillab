@@ -10,9 +10,22 @@ private let seedLog = Diag("seed")
 /// screen would be ones no model produced. Everything shown next to a grade has to be the
 /// detector's own output, so the seeded fields arrive unanalysed and the real models count them.
 ///
-/// The tiles come from the detector's own **test** split. That still flatters it: same source,
-/// same phone-camera dataset it was trained against, so a demo here shows the model at its best
-/// rather than its behaviour on this lab's slides.
+/// The fields come from **fold 4's held-out validation split** of `tuberculosis-phonecamera` —
+/// the 253 images this model never trained on. The split is reconstructed from `fold4/config.yaml`
+/// (`kfold: 5`, `seed: 42`, `strat_bins: [0,1,4,9]`), and the reconstruction is checked rather than
+/// assumed: measured count MAE over those 253 images is 1.415 against the 1.3241 recorded in
+/// `calibrated_metrics.json`. The direction of that gap is the evidence — training images would
+/// score *below* the recorded figure, being memorised, not slightly above it.
+///
+/// They are **not** the 416 px tiles under `AI TBC/output/TestingData`, which an earlier version of
+/// this file used. Those are cut for the YOLO pipeline, and this ResNet detects **zero** bacilli in
+/// them at every scale tried — so the demo graded every slide Negative while looking like it was
+/// working. If these images are ever swapped again, count what the model actually finds in the new
+/// ones before trusting the grade.
+///
+/// It still flatters the model: same dataset, same phone-camera rig it was tuned on, and fold 4 is
+/// the best of the five folds. A demo shows the model at its best, not its behaviour on this lab's
+/// slides.
 enum DemoSeeder {
 
     /// Matches the bundled `demo-field-NNN.jpg` files.

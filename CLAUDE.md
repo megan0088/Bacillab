@@ -82,10 +82,24 @@ It seeds **images, not counts.** The source tiles ship with ground-truth annotat
 those would make a session look instantly analysed while putting numbers on screen that no model
 produced. The seeded fields arrive unanalysed and the real models count them.
 
-The tiles come from the detector's own **test** split (`AI TBC/output/TestingData`) — never the
-training split, which the model memorised. Even so this flatters it: same source, same phone-camera
-dataset, so a demo shows the model at its best rather than its behaviour on this lab's slides.
-Patient names are prefixed `DEMO —` so nobody mistakes seeded data for a record.
+The fields come from **fold 4's held-out validation split** of `tuberculosis-phonecamera` (253
+images, reconstructed from `fold4/config.yaml`: `kfold: 5`, `seed: 42`, `strat_bins: [0,1,4,9]`).
+The reconstruction is verified, not assumed — measured count MAE 1.415 against the 1.3241 in
+`calibrated_metrics.json`, and *slightly above* is the tell: memorised training images would score
+below it.
+
+They are **not** the 416 px tiles in `AI TBC/output/TestingData`, which the seeder used until
+2026-08-19. Those are cut for the YOLO pipeline, and **this ResNet finds zero bacilli in them at
+every scale** — verified directly against the ONNX graph, including on untouched source files. The
+demo therefore graded every seeded slide Negative while appearing to work perfectly. Any future
+change of image source must be checked by counting what the model actually detects, because this
+failure is completely silent.
+
+The 50 seeded fields detect **258 bacilli — 516 per 100 fields**, mid-band for 2+, which needs 50
+fields. So the demo reaches a genuinely confirmed grade.
+
+Even so this flatters the model: same dataset, same phone-camera rig, and fold 4 is the best of the
+five folds. Patient names are prefixed `DEMO —` so nobody mistakes seeded data for a record.
 
 ### Grading is gated by field count — WHO/IUATLD
 `BTAGrade.minimumFields`: 3+ needs 20 fields, 2+ needs 50, and 1+/Scanty/**Negatif need the full
