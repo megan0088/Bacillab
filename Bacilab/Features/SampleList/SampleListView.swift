@@ -164,34 +164,8 @@ struct SampleListView: View {
         }
     }
 
-    /// What the row's badge says, and in what colour.
-    ///
-    /// A published session shows its **grade**, not a positive/negative binary — "Scanty" and
-    /// "Positive 3+" are different clinical statements and the list is where they are compared.
-    /// Colours follow `ResultSheetView`'s grade banner rather than the hi-fi's, so the same grade
-    /// never appears in two colours across two screens.
-    private func badge(for session: ExamSession) -> (text: String, color: Color) {
-        guard session.status == .published else {
-            return ("In progress", .orange)
-        }
-
-        let name = session.reportedGrade.displayName
-        // Colour comes from `BTAGrade.tint`, never from a switch here — see GradeTint.swift.
-        let color = session.reportedGrade.tint
-
-        // Below the WHO/IUATLD field minimum this grade is not a conclusion. The list is where
-        // someone scans to see what a slide said, so it must not read as final while the result
-        // sheet stamps PROVISIONAL on the same session. The sharpest case is a session whose
-        // fields all failed analysis: zero fields read, `suggestedGrade` falls back to Negative,
-        // and without this it would show a plain green "Negative" having read nothing at all.
-        guard session.isGradeConfirmed || DemoMode.hidesProvisionalMarks else {
-            return ("\(name) · Provisional", .orange)
-        }
-        return (name, color)
-    }
-
     private func row(for session: ExamSession) -> some View {
-        let badge = badge(for: session)
+        let badge = SessionBadge(session: session)
 
         return HStack(spacing: 14) {
             RoundedRectangle(cornerRadius: 10)
@@ -221,12 +195,7 @@ struct SampleListView: View {
 
             Spacer(minLength: 8)
 
-            Text(badge.text)
-                .font(.appCaption.weight(.semibold))
-                .padding(.horizontal, 9)
-                .padding(.vertical, 5)
-                .background(badge.color.opacity(0.15), in: Capsule())
-                .foregroundStyle(badge.color)
+            Badge(text: badge.text, tint: badge.tint)
                 .fixedSize()
 
             Image(systemName: "chevron.right")
