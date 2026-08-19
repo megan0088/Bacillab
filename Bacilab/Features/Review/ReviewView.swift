@@ -27,7 +27,7 @@ struct ReviewView: View {
         ScrollView {
             VStack(spacing: 20) {
                 if viewModel.queue.remaining > 0 {
-                    analysisProgress
+                    ReviewHeader(viewModel: viewModel)
                 }
 
                 FieldPager(
@@ -38,13 +38,16 @@ struct ReviewView: View {
 
                 fieldCanvas
                 detectorLegend
-                fieldCountRow
+                FieldCountRow(viewModel: viewModel, onEdit: { viewModel.openKeypad() })
                 fieldActions
 
                 Divider().padding(.vertical, 4)
 
                 totalsSection
-                gradeSection
+                GradePicker(session: session, viewModel: viewModel, onContinueScanning: {
+                    session.status = .scanning
+                    dismiss()
+                })
                 notesSection
                 publishButton
             }
@@ -89,22 +92,6 @@ struct ReviewView: View {
         .task { viewModel.analysePendingFields() }
     }
 
-    // MARK: - Queue
-
-    private var analysisProgress: some View {
-        HStack(spacing: 10) {
-            ProgressView()
-            Text("Analysing \(session.fields.count - viewModel.queue.remaining) "
-                 + "of \(session.fields.count) fields…")
-                .font(.appCaption)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 10)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 20)
-    }
-
     // MARK: - Lapang terpilih
 
     private var fieldCanvas: some View {
@@ -129,89 +116,6 @@ struct ReviewView: View {
         if let analysis = viewModel.selectedField?.analysis, !analysis.readings.isEmpty {
             DetectorLegend(readings: analysis.readings, primary: analysis.primary)
                 .padding(.horizontal, 20)
-        }
-    }
-
-    private var fieldCountRow: some View {
-        VStack(spacing: 8) {
-            Button {
-                viewModel.openKeypad()
-            } label: {
-                HStack(spacing: 10) {
-                    Text(countLabel)
-                        .font(.appHeading.weight(.bold))
-                        .foregroundStyle(.white)
-                        .contentTransition(.numericText())
-                    Text("BTA")
-                        .font(.appBody.weight(.semibold))
-                        .foregroundStyle(.white.opacity(0.5))
-                    Image(systemName: "pencil")
-                        .font(.appCaption)
-                        .foregroundStyle(.white.opacity(0.5))
-                }
-                .padding(.horizontal, 22)
-                .padding(.vertical, 10)
-                .background(.white.opacity(0.10), in: RoundedRectangle(cornerRadius: 10))
-                .overlay(RoundedRectangle(cornerRadius: 10)
-                    .stroke(.white.opacity(0.25), lineWidth: 1))
-            }
-            .foregroundStyle(.primary)
-
-            confidenceLine
-        }
-    }
-
-    /// Below this the field is flagged for a manual look. **Not calibrated** against read slides.
-    private static let lowConfidencePercent = 85
-
-    private var countLabel: String {
-        guard let field = viewModel.selectedField else { return "—" }
-        if field.isExcluded { return "—" }
-        guard let count = field.effectiveCount else { return "—" }
-        return "\(count)"
-    }
-
-    /// Confidence ditampilkan sebagai milik model, bukan sebagai kepastian hasil.
-    ///
-    /// Grafik ONNX sudah membuang deteksi di bawah 0,70, jadi angka ini tidak pernah bisa
-    /// terbaca di bawah 70% betapapun lemahnya sebuah lapang. Ia menyatakan seberapa yakin
-    /// model terhadap basil yang **ia simpan** — bukan seberapa yakin siapa pun terhadap
-    /// hitungannya.
-    @ViewBuilder
-    private var confidenceLine: some View {
-        if let field = viewModel.selectedField {
-            if field.correctedCount != nil {
-                Label("Corrected by analyst", systemImage: "hand.raised.fill")
-                    .font(.appCaption)
-                    .foregroundStyle(Color.accentColor)
-            } else if field.analysis == nil {
-                Text("Waiting for analysis…")
-                    .font(.appCaption)
-                    .foregroundStyle(.secondary)
-            } else if field.effectiveCount == nil {
-                Label("The model could not read this field — enter it manually",
-                      systemImage: "exclamationmark.triangle.fill")
-                    .font(.appCaption)
-                    .foregroundStyle(.orange)
-            } else if let confidence = field.analysis?.confidence {
-                let percent = Int((confidence * 100).rounded())
-                VStack(spacing: 4) {
-                    Text("\(percent)% AI Confidence Level")
-                        .font(.appCaption)
-                        .foregroundStyle(.white.opacity(0.55))
-
-                    // Prompts a second look; it never changes a count. The threshold is a
-                    // starting point, not a calibrated one — and note the graph already discards
-                    // detections below 0.70, so this figure can never read lower than 70% however
-                    // weak the field is. It says how sure the model is about the bacilli it kept.
-                    if percent < Self.lowConfidencePercent {
-                        Label("Low AI Confidence, Verify Manually",
-                              systemImage: "exclamationmark.circle.fill")
-                            .font(.appCaption)
-                            .foregroundStyle(.orange)
-                    }
-                }
-            }
         }
     }
 
@@ -279,72 +183,6 @@ struct ReviewView: View {
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
-    }
-
-    // MARK: - Grade
-
-    private var gradeSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Set Grade")
-                .font(.appBody.weight(.semibold))
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(BTAGrade.allCases, id: \.self) { grade in
-                        Button {
-                            viewModel.chooseGrade(grade)
-                        } label: {
-                            Text(grade.displayName)
-                                .font(.appCaption.weight(.semibold))
-                                .padding(.horizontal, 18)
-                                .padding(.vertical, 9)
-                                .background(session.reportedGrade == grade
-                                            ? Color.accentColor : Color(.systemGray5),
-                                            in: Capsule())
-                                .foregroundStyle(session.reportedGrade == grade ? .white : .primary)
-                        }
-                    }
-                }
-            }
-
-            if !session.isGradeConfirmed {
-                provisionalNotice
-            }
-        }
-        .padding(16)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal, 20)
-    }
-
-    /// Below the WHO/IUATLD threshold this grade may not stand as a report.
-    private var provisionalNotice: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Only the warning is suppressed for the exhibition. `Continue Scanning` below stays
-            // either way — hiding the shortfall *and* the way to fix it would leave the analyst
-            // no route to a grade that is actually confirmed.
-            if !DemoMode.hidesProvisionalMarks {
-                Label(
-                    "\(session.reportedGrade.displayName) needs \(session.reportedGrade.minimumFields) "
-                    + "fields (WHO/IUATLD). \(session.fieldsRemainingForGrade) more to go — "
-                    + "the result will be stamped PROVISIONAL.",
-                    systemImage: "exclamationmark.circle.fill"
-                )
-                .font(.appCaption)
-                .foregroundStyle(.orange)
-                .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Button {
-                session.status = .scanning
-                dismiss()
-            } label: {
-                Label("Continue Scanning", systemImage: "camera.fill")
-                    .font(.appCaption.weight(.semibold))
-                    .frame(maxWidth: .infinity, minHeight: 40)
-                    .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
-                    .foregroundStyle(Color.accentColor)
-            }
-        }
     }
 
     // MARK: - Catatan
