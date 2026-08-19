@@ -53,7 +53,7 @@ struct ResultSheetView: View {
     // MARK: - Patient
 
     private var patientCard: some View {
-        card {
+        Card {
             sectionHeading("Patient Information", tinted: true)
 
             infoRow("MRN", session.patient.medicalRecordNumber)
@@ -67,7 +67,7 @@ struct ResultSheetView: View {
     // MARK: - Result
 
     private var resultCard: some View {
-        card {
+        Card {
             sectionHeading("Result", tinted: true)
 
             Label("AI analysis ≠ Medical diagnosis", systemImage: "exclamationmark.triangle.fill")
@@ -225,7 +225,7 @@ struct ResultSheetView: View {
     // MARK: - Notes
 
     private var notesCard: some View {
-        card {
+        Card {
             sectionHeading("Notes by Medical Laboratory", tinted: false)
 
             TextEditor(text: $session.notes)
@@ -246,15 +246,6 @@ struct ResultSheetView: View {
     }
 
     // MARK: - Building blocks
-
-    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            content()
-        }
-        .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
-    }
 
     private func sectionHeading(_ title: String, tinted: Bool) -> some View {
         Text(title)
