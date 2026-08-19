@@ -27,15 +27,13 @@ struct BTADetectorTests {
     /// than returning a zero result, so a broken bundle now fails loudly. This test names the
     /// condition directly so the reason is obvious instead of surfacing as four unrelated
     /// count assertions.
-    @Test("Kedua detektor termuat dari bundle, bukan fallback")
-    func bothDetectorsAreLoaded() throws {
-        // Both models ship now: ResNet reads the field for the grade, YOLO reads the same
-        // field for comparison. Either one missing makes the comparison meaningless, so
-        // name both here rather than let it surface as odd counts elsewhere.
+    @Test("Detektor termuat dari bundle, bukan fallback")
+    func detectorIsLoaded() throws {
+        // This branch ships ResNet alone, so there is no comparison column to guard — but the
+        // presence check matters more here, not less: it is the only model, and without it the
+        // whole suite can go green while nothing ever loaded.
         #expect(ResNetAnalysisService.isDetectorLoaded,
                 "BTADetector.onnx tidak termuat — test lain bisa hijau tanpa model sama sekali")
-        #expect(YOLOAnalysisService.isDetectorLoaded,
-                "BTADetector.mlmodelc tidak termuat — kolom pembanding akan selalu kosong")
     }
 
     @Test("Model BTADetector ikut ter-bundle dan kontrak input/output-nya tetap")

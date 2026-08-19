@@ -31,8 +31,6 @@ final class MultiDetectorService: AnalysisServiceProtocol {
     /// nothing else needs to know.
     init(detectors: [DetectorKind: any AnalysisServiceProtocol] = [
         .resnet: ResNetAnalysisService(),
-        // .yolo: YOLOAnalysisService(),
-        .yolo11: YOLO11AnalysisService(),
     ]) {
         self.detectors = detectors
     }

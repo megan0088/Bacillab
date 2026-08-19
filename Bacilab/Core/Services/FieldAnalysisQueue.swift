@@ -173,7 +173,7 @@ final class FieldAnalysisQueue {
 
     private func analyse(_ job: Job) async -> FieldAnalysis {
         do {
-            let result = try await analysisService.analyze(imageData: job.imageData, using: .all)
+            let result = try await analysisService.analyze(imageData: job.imageData, using: .resnet)
             return FieldAnalysis(readings: result.readings, primary: .resnet)
         } catch {
             queueLog.error("Analisis lapang gagal: \(error.localizedDescription)")
