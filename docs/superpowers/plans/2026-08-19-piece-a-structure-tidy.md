@@ -6,6 +6,10 @@
 
 **Architecture:** A design system in four layers (`Tokens`, `Atoms`, `Molecules`, `Organisms`) holding only what is shared, with feature-owned components staying in their feature. Placement is decided by one rule: does it know about BTA, and is it used by more than one feature. No behaviour changes — the existing suite is the specification.
 
+**Beyond the spec:** Task 2 (`GradeCopy`) and the `SessionBadge` half of Task 6 were not in the spec's file list. Both come from a defect found while reading the code for this plan: the same grade renders as `"1+"` in Review, `"Positive 1+"` in history and `"Positive (1+)"` on the result sheet, and the logic deciding whether a grade may be shown as final lives inside a private View method no test can reach. Both are squarely the tidy this piece exists to do, and both are testable, so they are planned here rather than deferred.
+
+**A note on move steps:** where a task moves existing code, the step gives the member's name and its line range rather than reproducing the body. Re-typing several hundred lines across four view splits would invite transcription drift in exactly the code that must not change behaviour; the source is the authority and `git mv` plus a named member is the precise instruction.
+
 **Tech Stack:** Swift, SwiftUI, `@Observable`/`@Bindable`, swift-testing (`import Testing`, `@Test`, `#expect`), Xcode synchronized file groups.
 
 ## Global Constraints
@@ -18,6 +22,7 @@
 - Type scale is exactly 34 / 22 / 17 / 13 via `Font.appTitle` / `.appHeading` / `.appBody` / `.appCaption`, SF Pro. Never `design: .rounded`, and never a fifth size — apply `.weight(...)` at the call site instead.
 - UI copy is in English. Test names in `BacilabTests` are in Indonesian; match the surrounding file.
 - **`BTAGrade.rawValue` is the storage key in `manifest.json`.** Never change a case's raw value: `SessionStore` skips manifests it cannot decode, so every saved session would silently vanish from the list rather than raise an error.
+- **Line numbers in this plan are as of the plan being written, before any task ran.** Earlier tasks edit the same files, so by the time you reach a later task the numbers will have moved. Always locate a member by its name (`private var gradeBox`, `private func infoRow`) and treat the line number as a hint about where to start looking.
 - Behaviour must not change. Any test that needs its expectations edited (beyond a rename) means something broke — stop and report it.
 
 **Full test command** (used by every task):
