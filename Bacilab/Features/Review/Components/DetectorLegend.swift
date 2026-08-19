@@ -18,7 +18,8 @@ struct DetectorLegend: View {
         VStack(alignment: .leading, spacing: 6) {
             ForEach(readings, id: \.detector) { reading in
                 HStack(spacing: 8) {
-                    swatch(for: reading.detector)
+                    Swatch(tint: DetectorStyle.tint(for: reading.detector),
+                           dash: DetectorStyle.dash(for: reading.detector))
 
                     Text(reading.detector.rawValue)
                         .font(.appCaption.weight(.semibold))
@@ -42,16 +43,6 @@ struct DetectorLegend: View {
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
         .background(.white.opacity(0.06), in: RoundedRectangle(cornerRadius: 10))
-    }
-
-    private func swatch(for detector: DetectorKind) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: 0, y: 5))
-            path.addLine(to: CGPoint(x: 26, y: 5))
-        }
-        .stroke(DetectorStyle.tint(for: detector),
-                style: StrokeStyle(lineWidth: 2.5, dash: DetectorStyle.dash(for: detector)))
-        .frame(width: 26, height: 10)
     }
 }
 
