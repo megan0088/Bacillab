@@ -15,6 +15,9 @@ Two pieces, strictly sequenced:
 - **A — Structure tidy + `ARCHITECTURE.md`**, done on `flow-redesign`, then merged to `main`.
 - **B — Three single-model branches**, cut from `main` *after* A lands.
 
+**Each piece gets its own implementation plan.** Piece A is planned and executed first; Piece B is
+planned only once A has merged into `main`, because its starting point does not exist until then.
+
 B must not start before A is merged. Moving files is the change most likely to produce merge
 conflicts, and the branches diverge **permanently** (see Piece B), so the merge into `main` is the
 last moment anything can be fixed once for everybody. Tidying after the split means doing it three
@@ -76,6 +79,9 @@ Extraction is justified by measured repetition, not by taste:
 
 ### View splits
 
+**The rename below happens first**, so these components land in `Features/Home/Components/`, not
+`Features/SampleList/Components/`.
+
 Four view files carry more than one responsibility. Each keeps composition and hands its parts to
 components in its own feature folder:
 
@@ -83,7 +89,7 @@ components in its own feature folder:
 |---|---|---|
 | `ReviewView` | 415 | view + `ReviewHeader`, `GradePicker`, `FieldCountRow` |
 | `ResultSheetView` | 352 | view + `GradeBox`, `PatientSection`, `NotesSection` |
-| `SampleListView` | 253 | view + `HistoryRow`, `NewAnalysisCard`, `SearchBar` |
+| `HomeView` (renamed, below) | 253 | view + `HistoryRow`, `NewAnalysisCard`, `SearchBar` |
 | `ScanView` | 243 | view + `Viewfinder`, `ShutterBar` |
 
 Existing feature components (`FieldCanvas`, `FieldPager`, `CountKeypad`, `DetectorLegend`,
@@ -92,7 +98,7 @@ Existing feature components (`FieldCanvas`, `FieldPager`, `CountKeypad`, `Detect
 ### Rename: `SampleList` → `Home`
 
 `Features/SampleList/` → `Features/Home/`, `SampleListView` → `HomeView`, `SampleListViewModel` →
-`HomeViewModel`, and the references in `ElectraLabApp` and the test suite. The `Sample` type this
+`HomeViewModel`, and the 5 references across `ElectraLabApp` and the test suite. The `Sample` type this
 was named after no longer exists, so the name now sends a new reader looking for something that
 is not there.
 
@@ -126,9 +132,12 @@ Cut from `main` after Piece A merges.
 
 | Branch | Model kept | Grading detector |
 |---|---|---|
-| `branch-ega` | YOLOv8 — `BTADetector.mlmodelc` | YOLOv8 |
-| `branch-jesslyn` | YOLO11 — `BTADetectorV11` | YOLO11 |
-| `branch-mge` | ResNet — `BTADetector.onnx` | ResNet |
+| `branch-ega` | YOLOv8 — `Resources/BTADetector.mlpackage` | YOLOv8 |
+| `branch-jesslyn` | YOLO11 — `Resources/BTADetectorV11.mlpackage` | YOLO11 |
+| `branch-mge` | ResNet — `Resources/BTADetector.onnx` | ResNet |
+
+Xcode compiles a bundled `.mlpackage` into `.mlmodelc`, which is what the CoreML services load at
+runtime; the `.mlpackage` is what lives in the repository and what a branch deletes.
 
 ### What each branch removes
 
