@@ -83,7 +83,7 @@ struct ResultSheetView: View {
 
             if !session.isGradeConfirmed, !DemoMode.hidesProvisionalMarks {
                 Label(
-                    "Only \(session.examinedFieldCount) fields read. \(grade.rawValue) requires "
+                    "Only \(session.examinedFieldCount) fields read. \(grade.displayName) requires "
                     + "\(grade.minimumFields) fields (WHO/IUATLD), so this result is not final.",
                     systemImage: "exclamationmark.circle.fill"
                 )
