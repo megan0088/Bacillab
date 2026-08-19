@@ -7,24 +7,6 @@ private let resnetLog = Diag("resnet")
 @preconcurrency import OnnxRuntimeBindings
 import UIKit
 
-// Errors that can be thrown during BTA analysis
-enum AnalysisError: LocalizedError {
-    case invalidImage
-    case modelUnavailable
-    case inferenceFailure(String)
-
-    var errorDescription: String? {
-        switch self {
-        case .invalidImage:
-            return "The image is invalid or could not be processed."
-        case .modelUnavailable:
-            return "The BTA detection model could not be loaded, so no count can be produced."
-        case .inferenceFailure(let msg):
-            return "Detection failed to run: \(msg)"
-        }
-    }
-}
-
 final class ResNetAnalysisService: AnalysisServiceProtocol {
 
     // BTADetector.onnx is fold 4 of the 5-fold run in `runs/`: a torchvision
