@@ -15,7 +15,7 @@ struct PatientDataView: View {
                 // Field names sit in the placeholder rather than on a label above, matching the
                 // hi-fi. The grouping is corrected, though: the design file placed Patient Name
                 // under "Test Information", which is not where anyone would look for it.
-                sectionHeader("Patient Information")
+                SectionHeader("Patient Information", tinted: true)
 
                 formField("Medical Record Number (MRN)", text: $session.patient.medicalRecordNumber)
                 formField("NIK", text: $session.patient.nationalID)
@@ -24,7 +24,7 @@ struct PatientDataView: View {
                 formField("Address", text: $session.patient.address)
                 formField("Phone Number", text: $session.patient.phone)
 
-                sectionHeader("Test Information")
+                SectionHeader("Test Information", tinted: true)
 
                 dateField("Examination Date", date: $session.patient.examinationDate)
                 dateField("Sample Collection Time", date: $session.patient.sampleCollectedAt,
@@ -60,12 +60,6 @@ struct PatientDataView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-    }
-
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.appBody.weight(.bold))
-            .foregroundStyle(Color.accentColor)
     }
 
     private func formField(_ placeholder: String, text: Binding<String>) -> some View {

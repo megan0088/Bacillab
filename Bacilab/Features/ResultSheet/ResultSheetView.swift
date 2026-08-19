@@ -54,13 +54,13 @@ struct ResultSheetView: View {
 
     private var patientCard: some View {
         Card {
-            sectionHeading("Patient Information", tinted: true)
+            SectionHeader("Patient Information", tinted: true)
 
-            infoRow("MRN", session.patient.medicalRecordNumber)
-            infoRow("NIK", session.patient.nationalID)
-            infoRow("Name", session.patient.name)
-            infoRow("DOB", formatted(session.patient.dateOfBirth))
-            infoRow("Examination Date", formatted(session.patient.examinationDate))
+            InfoRow("MRN", session.patient.medicalRecordNumber)
+            InfoRow("NIK", session.patient.nationalID)
+            InfoRow("Name", session.patient.name)
+            InfoRow("DOB", formatted(session.patient.dateOfBirth))
+            InfoRow("Examination Date", formatted(session.patient.examinationDate))
         }
     }
 
@@ -68,7 +68,7 @@ struct ResultSheetView: View {
 
     private var resultCard: some View {
         Card {
-            sectionHeading("Result", tinted: true)
+            SectionHeader("Result", tinted: true)
 
             Label("AI analysis ≠ Medical diagnosis", systemImage: "exclamationmark.triangle.fill")
                 .font(.appCaption)
@@ -76,9 +76,9 @@ struct ResultSheetView: View {
 
             gradeBox
 
-            infoRow("Total Fields Read", "\(session.examinedFieldCount)")
-            infoRow("Total BTA Detected", "\(session.totalBTA)")
-            infoRow("AI Confidence",
+            InfoRow("Total Fields Read", "\(session.examinedFieldCount)")
+            InfoRow("Total BTA Detected", "\(session.totalBTA)")
+            InfoRow("AI Confidence",
                     meanConfidence.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
 
             if !session.isGradeConfirmed, !DemoMode.hidesProvisionalMarks {
@@ -226,7 +226,7 @@ struct ResultSheetView: View {
 
     private var notesCard: some View {
         Card {
-            sectionHeading("Notes by Medical Laboratory", tinted: false)
+            SectionHeader("Notes by Medical Laboratory", tinted: false)
 
             TextEditor(text: $session.notes)
                 .frame(minHeight: 90)
@@ -246,25 +246,6 @@ struct ResultSheetView: View {
     }
 
     // MARK: - Building blocks
-
-    private func sectionHeading(_ title: String, tinted: Bool) -> some View {
-        Text(title)
-            .font(.appBody.weight(.bold))
-            .foregroundStyle(tinted ? Color.accentColor : .primary)
-    }
-
-    /// Label on the left, value on the right — the shape a printed lab report uses.
-    private func infoRow(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .top) {
-            Text(label)
-                .font(.appBody.weight(.semibold))
-            Spacer(minLength: 12)
-            Text(value.isEmpty ? "—" : value)
-                .font(.appBody)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.trailing)
-        }
-    }
 
     /// Writes the session back after the lab changes something here.
     ///
