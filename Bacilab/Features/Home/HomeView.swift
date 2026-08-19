@@ -1,11 +1,11 @@
 import SwiftUI
 
-struct SampleListView: View {
-    @State private var viewModel: SampleListViewModel
+struct HomeView: View {
+    @State private var viewModel: HomeViewModel
     @Environment(AppDependencies.self) private var dependencies
     @State private var newSession: ExamSession?
 
-    init(viewModel: SampleListViewModel) {
+    init(viewModel: HomeViewModel) {
         _viewModel = State(initialValue: viewModel)
     }
 
@@ -210,6 +210,6 @@ struct SampleListView: View {
 
 #Preview("Home") {
     let deps = AppDependencies()
-    return SampleListView(viewModel: SampleListViewModel(sessionStore: deps.sessionStore))
+    return HomeView(viewModel: HomeViewModel(sessionStore: deps.sessionStore))
         .environment(deps)
 }

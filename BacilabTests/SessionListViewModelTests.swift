@@ -31,7 +31,7 @@ struct SessionListViewModelTests {
     func loadsSessions() async {
         let store = StubStore()
         store.sessions = [session(name: "A", mrn: "RM-1", status: .published)]
-        let vm = SampleListViewModel(sessionStore: store)
+        let vm = HomeViewModel(sessionStore: store)
 
         await vm.load()
 
@@ -46,7 +46,7 @@ struct SessionListViewModelTests {
             session(name: "A", mrn: "RM-1", status: .scanning),
             session(name: "B", mrn: "RM-2", status: .reviewing)
         ]
-        let vm = SampleListViewModel(sessionStore: store)
+        let vm = HomeViewModel(sessionStore: store)
         await vm.load()
 
         #expect(vm.sessions.allSatisfy { $0.displayStatus == .running },
@@ -61,7 +61,7 @@ struct SessionListViewModelTests {
             session(name: "B", mrn: "RM-2", status: .published, grade: .negative),
             session(name: "C", mrn: "RM-3", status: .published, grade: .plus2)
         ]
-        let vm = SampleListViewModel(sessionStore: store)
+        let vm = HomeViewModel(sessionStore: store)
         await vm.load()
 
         #expect(vm.filteredSessions.count == 3)
@@ -81,7 +81,7 @@ struct SessionListViewModelTests {
         siti.patient.nationalID = "3204014403950002"
         store.sessions = [ahmad, siti]
 
-        let vm = SampleListViewModel(sessionStore: store)
+        let vm = HomeViewModel(sessionStore: store)
         await vm.load()
 
         // Kolomnya berlabel nomor KTP, jadi ini yang paling utama harus cocok.
@@ -101,7 +101,7 @@ struct SessionListViewModelTests {
         let store = StubStore()
         let target = session(name: "A", mrn: "RM-1", status: .scanning)
         store.sessions = [target]
-        let vm = SampleListViewModel(sessionStore: store)
+        let vm = HomeViewModel(sessionStore: store)
         await vm.load()
 
         await vm.delete(target)

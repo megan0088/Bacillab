@@ -3,7 +3,7 @@ import Observation
 
 @MainActor
 @Observable
-final class SampleListViewModel {
+final class HomeViewModel {
     private let sessionStore: any SessionStoreProtocol
 
     private(set) var sessions: [ExamSession] = []

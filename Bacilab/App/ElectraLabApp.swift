@@ -8,8 +8,8 @@ struct ElectraLabApp: App {
     var body: some Scene {
         WindowGroup {
             ZStack {
-                SampleListView(
-                    viewModel: SampleListViewModel(
+                HomeView(
+                    viewModel: HomeViewModel(
                         sessionStore: dependencies.sessionStore,
                         seedsDemoData: true
                     )

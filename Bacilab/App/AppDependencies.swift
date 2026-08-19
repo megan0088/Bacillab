@@ -17,7 +17,7 @@ final class AppDependencies {
 
     /// The analysis queue for a session — the same instance every time it is asked for.
     ///
-    /// One queue per session, but **not** a fresh one per call. `ScanView` and `SampleListView`'s
+    /// One queue per session, but **not** a fresh one per call. `ScanView` and `HomeView`'s
     /// review destination both ask for a queue, and a navigation destination is rebuilt on every
     /// push, so minting one per call meant leaving Review and returning started a second worker
     /// over the same session: two ONNX runs in parallel where the design is deliberately serial,
