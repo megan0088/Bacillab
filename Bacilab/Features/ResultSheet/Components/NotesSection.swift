@@ -6,7 +6,6 @@ import SwiftUI
 /// itself, unlike the grade and the counts, which were all decided in Review.
 struct NotesSection: View {
     @Bindable var session: ExamSession
-    let onCommit: () -> Void
 
     var body: some View {
         Card {
@@ -33,7 +32,7 @@ struct NotesSection: View {
 #Preview("Notes") {
     let session = ExamSession()
     session.notes = "Sputum sample, morning collection."
-    return NotesSection(session: session, onCommit: {})
+    return NotesSection(session: session)
         .padding()
         .background(Color(.systemGroupedBackground))
 }

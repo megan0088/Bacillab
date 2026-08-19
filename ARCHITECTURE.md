@@ -111,8 +111,9 @@ reaching for `@Environment`.
    blocked waiting on the model.
 5. Review shows the field with its detections drawn on it, and lets the technician correct the
    count or delete the field outright.
-6. Publishing freezes the reading: whatever grade and counts are on screen at that point become
-   the report.
+6. Publishing freezes the counts: whatever per-field counts are on screen at that point become
+   the report. The grade does not freeze — `GradeBox` deliberately lets the lab re-decide the
+   grade on the published sheet, and that choice persists, same as ordinary practice.
 
 ## 5. Decisions not to change without reading why
 

@@ -158,7 +158,7 @@ Bacilab/Bacilab/
 │   │   ├── ResNetAnalysisService.swift # BTADetector.onnx via ONNX Runtime — grading model
 │   │   ├── YOLOAnalysisService.swift   # BTADetector.mlmodelc (YOLOv8s-OBB) — comparison only
 │   │   ├── YOLO11AnalysisService.swift # YOLO11 CoreML — comparison only
-│   │   ├── MultiDetectorService.swift  # Runs all three detectors concurrently over identical bytes
+│   │   ├── MultiDetectorService.swift  # Runs the enabled detectors serially over identical bytes (concurrent run roughly doubles peak memory per field)
 │   │   ├── SessionStore.swift          # Reads/writes ExamSession + field images under Application Support
 │   │   ├── FieldAnalysisQueue.swift    # Serial background analysis while scanning continues
 │   │   ├── FocusMetric.swift           # Sharpness/blur warning, never blocks capture
@@ -186,7 +186,7 @@ Every field is read by every **enabled** model; only one of them ever grades:
 | `ResNetAnalysisService` | `BTADetector.onnx`, Faster R-CNN, ONNX Runtime. The grading model. |
 | `YOLOAnalysisService` | `BTADetector.mlmodelc`, YOLOv8s-OBB, CoreML. **Currently switched off** — see below. |
 | `YOLO11AnalysisService` | YOLO11 end-to-end, CoreML. Comparison only. |
-| `MultiDetectorService` | Runs the enabled models concurrently, over identical bytes. |
+| `MultiDetectorService` | Runs the enabled models serially, over identical bytes — concurrently roughly doubles peak memory per field, which is what gets a 20-field queue jetsam-killed. |
 
 ### YOLOv8 is switched off, not removed
 Only ResNet and YOLO11 currently ship. `MultiDetectorService`'s default detector dictionary has
@@ -228,11 +228,15 @@ Boxes from all three models are flattened into one `ForEach`, with ids like `"Re
 `"YOLOv8-3"`, `"YOLO11-2"` (`FieldCanvas.Marker.id`). Every model numbers its own boxes from 0,
 so a nested `ForEach` per reading would let the inner ids collide.
 
-The canvas is a **square, with a dashed circle drawn on top only as an eyepiece guide — never a
-mask**: the square is exactly `FieldFraming`'s crop, so everything shown is analysed and
-everything analysed is shown. A circular *mask* would hide ~21% of the analysed area — bacilli
-could be counted where the analyst cannot see them; the dashed circle here is decoration, not a
-clip.
+The canvas **does** clip to a circle (`FieldCanvas.body`, `.clipShape(Circle())`), matching what
+the microscope eyepiece actually shows — and that is safe only because
+`MultiDetectorService.restrictedToFieldOfView` drops every detection whose centre falls outside
+that same inscribed circle before it ever reaches the UI or the count. The two are inseparable:
+everything counted is visible, and everything visible is counted. Clipping the canvas **without**
+that restriction is what the earlier version of this rule warned against — a mask alone would
+hide ~21% of the analysed square while the model kept counting bacilli inside it, marks the
+analyst is shown as absent but that were quietly scored anyway. Do not remove either half on its
+own; either direction changes BTA counts.
 
 ### Diagnosing a device-only detection bug
 `Diag` logs to `os.Logger` **and** stderr in Debug, because `devicectl … --console` relays only

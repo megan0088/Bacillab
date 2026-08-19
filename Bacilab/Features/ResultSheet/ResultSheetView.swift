@@ -30,7 +30,7 @@ struct ResultSheetView: View {
             VStack(spacing: 16) {
                 PatientSection(patient: session.patient)
                 resultCard
-                NotesSection(session: session, onCommit: persist)
+                NotesSection(session: session)
             }
             .padding(20)
         }
@@ -82,10 +82,6 @@ struct ResultSheetView: View {
         Task {
             try? await dependencies.sessionStore.save(session.snapshot())
         }
-    }
-
-    private func formatted(_ date: Date) -> String {
-        date.formatted(.dateTime.day().month(.wide).year())
     }
 }
 
