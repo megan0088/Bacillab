@@ -72,9 +72,17 @@ final class ResNetAnalysisService: AnalysisServiceProtocol {
     /// folds; the 5-fold mean is AP50 0.72 / count MAE 1.81. Neither has been checked
     /// against slides read at Electra Lab.
     func analyze(imageData: Data) async throws -> AnalysisResult {
-        guard let uiImage = UIImage(data: imageData),
-              let cgImage = FieldFraming.uprightCenteredSquare(of: uiImage) else {
-            throw AnalysisError.invalidImage
+        // Pooled: decoding a 1224² JPEG and redrawing it through UIGraphicsImageRenderer leaves
+        // several full-frame bitmaps in the autorelease pool. On one field that is invisible; the
+        // queue runs twenty back to back, and without a pool of their own they are only released
+        // when the enclosing pool drains — which on a cooperative-pool thread is not tied to the
+        // loop at all.
+        let cgImage: CGImage = try autoreleasepool {
+            guard let uiImage = UIImage(data: imageData),
+                  let cg = FieldFraming.uprightCenteredSquare(of: uiImage) else {
+                throw AnalysisError.invalidImage
+            }
+            return cg
         }
 
         // A missing model must be loud. This used to return a stub
@@ -88,13 +96,18 @@ final class ResNetAnalysisService: AnalysisServiceProtocol {
 
         return try await withCheckedThrowingContinuation { continuation in
             Self.inferenceQueue.async {
-                do {
-                    continuation.resume(returning: try Self.detect(in: cgImage, using: session))
-                } catch let error as AnalysisError {
-                    continuation.resume(throwing: error)
-                } catch {
-                    continuation.resume(
-                        throwing: AnalysisError.inferenceFailure(error.localizedDescription))
+                // `detect` builds a 3×1224×1224 Float array (~18 MB) and copies it again into an
+                // NSMutableData for ORT. Pooled so that peak belongs to one field rather than
+                // accumulating across the queue.
+                autoreleasepool {
+                    do {
+                        continuation.resume(returning: try Self.detect(in: cgImage, using: session))
+                    } catch let error as AnalysisError {
+                        continuation.resume(throwing: error)
+                    } catch {
+                        continuation.resume(
+                            throwing: AnalysisError.inferenceFailure(error.localizedDescription))
+                    }
                 }
             }
         }

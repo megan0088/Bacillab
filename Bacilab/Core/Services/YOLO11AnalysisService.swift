@@ -61,9 +61,14 @@ final class YOLO11AnalysisService: AnalysisServiceProtocol {
     static var isDetectorLoaded: Bool { vnModel != nil }
 
     func analyze(imageData: Data) async throws -> AnalysisResult {
-        guard let uiImage = UIImage(data: imageData),
-              let cgImage = FieldFraming.uprightCenteredSquare(of: uiImage) else {
-            throw AnalysisError.invalidImage
+        // Same reasoning as ResNetAnalysisService: pooled so a full-frame decode belongs to one
+        // field instead of accumulating across a twenty-field queue.
+        let cgImage: CGImage = try autoreleasepool {
+            guard let uiImage = UIImage(data: imageData),
+                  let cg = FieldFraming.uprightCenteredSquare(of: uiImage) else {
+                throw AnalysisError.invalidImage
+            }
+            return cg
         }
 
         guard let model = Self.vnModel else {
@@ -105,11 +110,15 @@ final class YOLO11AnalysisService: AnalysisServiceProtocol {
             // keeps it identical to how the other CoreML detector is fed.
             request.imageCropAndScaleOption = .scaleFit
 
-            let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
-            do {
-                try handler.perform([request])
-            } catch {
-                continuation.resume(throwing: AnalysisError.inferenceFailure(error.localizedDescription))
+            // Vision allocates its own pixel buffers per request; pooled for the same reason.
+            autoreleasepool {
+                let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
+                do {
+                    try handler.perform([request])
+                } catch {
+                    continuation.resume(
+                        throwing: AnalysisError.inferenceFailure(error.localizedDescription))
+                }
             }
         }
     }

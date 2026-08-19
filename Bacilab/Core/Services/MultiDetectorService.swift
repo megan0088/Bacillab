@@ -42,26 +42,25 @@ final class MultiDetectorService: AnalysisServiceProtocol {
     }
 
     func analyze(imageData: Data, using selection: DetectorSelection) async throws -> AnalysisResult {
-        // All requested models run concurrently: the two YOLOs are milliseconds against the
-        // ResNet's seconds, so the comparison costs the technician essentially nothing beyond
-        // the slowest single model.
         let requested = DetectorKind.allCases.filter {
             selection.includes($0) && detectors[$0] != nil
         }
 
-        let outcomes = await withTaskGroup(of: Outcome.self) { group -> [Outcome] in
-            for kind in requested {
-                guard let service = detectors[kind] else { continue }
-                group.addTask { await self.timed(kind) { try await service.analyze(imageData: imageData) } }
-            }
-            var collected: [Outcome] = []
-            for await outcome in group { collected.append(outcome) }
-            // Task groups complete out of order; restore a stable order so the columns do
-            // not swap places between fields.
-            return collected.sorted {
-                let all = DetectorKind.allCases
-                return all.firstIndex(of: $0.reading.detector)! < all.firstIndex(of: $1.reading.detector)!
-            }
+        // **One model at a time, deliberately.** These ran concurrently, on the reasoning that
+        // YOLO is milliseconds against ResNet's seconds so the comparison was nearly free. That
+        // is true of *time* and false of *memory*: each model decodes its own full-frame bitmap
+        // and ResNet additionally builds a 3×1224×1224 Float array and copies it for ORT, so
+        // running them together roughly doubles the peak for one field. A twenty-field queue on
+        // a phone is where that gets an app killed, and a jetsam kill arrives as an abrupt exit
+        // with no error — indistinguishable, from the outside, from the crash it looks like.
+        //
+        // Sequential also fixes the ordering for free: `requested` is already in
+        // `DetectorKind.allCases` order, so the columns cannot swap places between fields and
+        // the sort that used to restore that is gone.
+        var outcomes: [Outcome] = []
+        for kind in requested {
+            guard let service = detectors[kind] else { continue }
+            outcomes.append(await timed(kind) { try await service.analyze(imageData: imageData) })
         }
 
         // The grading model's failure is a real failure — there is no result without it.
