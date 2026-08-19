@@ -262,7 +262,7 @@ struct ReviewView: View {
             Divider().frame(height: 44)
             statCell(label: "Total BTA", value: "\(session.totalBTA)")
             Divider().frame(height: 44)
-            statCell(label: "Model Suggests", value: session.suggestedGrade.rawValue)
+            statCell(label: "Model Suggests", value: session.suggestedGrade.displayName)
         }
         .padding(.vertical, 14)
         .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 14))
@@ -294,7 +294,7 @@ struct ReviewView: View {
                         Button {
                             viewModel.chooseGrade(grade)
                         } label: {
-                            Text(grade.rawValue)
+                            Text(grade.displayName)
                                 .font(.appCaption.weight(.semibold))
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 9)
@@ -324,7 +324,7 @@ struct ReviewView: View {
             // no route to a grade that is actually confirmed.
             if !DemoMode.hidesProvisionalMarks {
                 Label(
-                    "\(session.reportedGrade.rawValue) needs \(session.reportedGrade.minimumFields) "
+                    "\(session.reportedGrade.displayName) needs \(session.reportedGrade.minimumFields) "
                     + "fields (WHO/IUATLD). \(session.fieldsRemainingForGrade) more to go — "
                     + "the result will be stamped PROVISIONAL.",
                     systemImage: "exclamationmark.circle.fill"

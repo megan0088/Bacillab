@@ -19,35 +19,9 @@ struct ResultSheetView: View {
 
     private var gradeColor: Color { grade.tint }
 
-    private var gradeLabel: String { Self.label(for: grade) }
+    private var gradeLabel: String { grade.displayName }
 
-    /// The WHO/IUATLD criterion for a band — a definition, not a report of what was seen.
-    ///
-    /// These differ from the hi-fi's table, which had Negative as "no BTA in 1 field of view" and
-    /// Scanty as 1–10. Negative in particular has to say 100: the whole point of the field gates
-    /// is that one clean field is nowhere near enough to call a slide negative, and a reference
-    /// table saying otherwise is the sort of thing someone checks a result against.
-    private static func criterion(for grade: BTAGrade) -> String {
-        switch grade {
-        case .negative: return "No BTA in 100 fields of view"
-        case .scanty:   return "1–9 BTA in 100 fields of view; repeat examination advised"
-        case .plus1:    return "10–99 BTA in 100 fields of view"
-        case .plus2:    return "1–10 BTA per field, across at least 50 fields"
-        case .plus3:    return "More than 10 BTA per field, across at least 20 fields"
-        }
-    }
-
-    private static func label(for grade: BTAGrade) -> String {
-        switch grade {
-        case .negative: return "Negative"
-        case .scanty:   return "Scanty"
-        case .plus1:    return "Positive (1+)"
-        case .plus2:    return "Positive (2+)"
-        case .plus3:    return "Positive (3+)"
-        }
-    }
-
-    private var gradeCriterion: String { Self.criterion(for: grade) }
+    private var gradeCriterion: String { grade.criterion }
 
     /// Mean confidence over the fields that actually contributed a count.
     ///
@@ -191,10 +165,10 @@ struct ResultSheetView: View {
                 } label: {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
-                            Text(Self.label(for: band))
+                            Text(band.displayName)
                                 .font(.appBody.weight(.bold))
                                 .foregroundStyle(band == grade ? gradeColor : .primary)
-                            Text(Self.criterion(for: band))
+                            Text(band.criterion)
                                 .font(.appCaption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)

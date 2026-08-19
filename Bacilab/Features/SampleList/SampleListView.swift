@@ -175,14 +175,7 @@ struct SampleListView: View {
             return ("In progress", .orange)
         }
 
-        let name: String
-        switch session.reportedGrade {
-        case .negative: name = "Negative"
-        case .scanty:   name = "Scanty"
-        case .plus1:    name = "Positive 1+"
-        case .plus2:    name = "Positive 2+"
-        case .plus3:    name = "Positive 3+"
-        }
+        let name = session.reportedGrade.displayName
         // Colour comes from `BTAGrade.tint`, never from a switch here — see GradeTint.swift.
         let color = session.reportedGrade.tint
 
