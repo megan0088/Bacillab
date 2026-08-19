@@ -6,7 +6,25 @@ private let yolo11Log = Diag("yolo11")
 
 /// The third detector: YOLO11 exported end-to-end, running through CoreML.
 ///
-/// Source: `AI TBC/Model Jess/bestYOLO11Uganda.mlpackage`, bundled as `BTADetectorV11`.
+/// Source: `H-ods3-clahe.mlpackage`, bundled as `BTADetectorODS3` — an Ultralytics **YOLO26n**
+/// trained on `data/tiled_ods3_clahe/data.yaml`. Input 640×640 RGB, one class `AFB`, and
+/// `end2end = True`, so the `(1, 300, 6)` output is already deduplicated exactly as the previous
+/// YOLO11 export was. That shape match is why this decoder needed no change.
+///
+/// **Two things about this model are not yet accounted for, and both would show up as quiet
+/// under-counting rather than as an error:**
+///
+/// 1. It was trained on **CLAHE-enhanced** images (contrast-limited adaptive histogram
+///    equalisation — the `_clahe` in its training path). Nothing in this app applies CLAHE, so
+///    every field reaches it looking unlike anything it saw in training. How much that costs has
+///    not been measured.
+/// 2. It was trained on **tiles**, not whole fields, and its input is 640×640 while
+///    `FieldFraming` hands over a 1224² square that Vision then scales down. Bacilli therefore
+///    arrive smaller than the ones it learned on.
+///
+/// Measure this model against fold 4's held-out images before quoting any figure from it, and
+/// compare a CLAHE-preprocessed run against a raw one before concluding anything about its
+/// accuracy. A count that differs from the other detectors is not yet evidence about the model.
 /// Single class `AFB`, trained on the Uganda set, converted 2026-08-10 from torch 2.8.
 ///
 /// Comparison only — `MultiDetectorService` never lets its count reach the grade unless the
@@ -28,8 +46,8 @@ final class YOLO11AnalysisService: AnalysisServiceProtocol {
     private let confidenceThreshold: Float = 0.25
 
     private static let vnModel: VNCoreMLModel? = {
-        guard let url = Bundle.main.url(forResource: "BTADetectorV11", withExtension: "mlmodelc") else {
-            yolo11Log.error("BTADetectorV11.mlmodelc tidak ada di bundle")
+        guard let url = Bundle.main.url(forResource: "BTADetectorODS3", withExtension: "mlmodelc") else {
+            yolo11Log.error("BTADetectorODS3.mlmodelc tidak ada di bundle")
             return nil
         }
         do {

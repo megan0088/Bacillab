@@ -19,7 +19,7 @@ struct YOLO11RawTensorTests {
         let image = try #require(UIImage(data: try Data(contentsOf: url)))
         let square = try #require(FieldFraming.uprightCenteredSquare(of: image))
 
-        let modelURL = try #require(Bundle.main.url(forResource: "BTADetectorV11", withExtension: "mlmodelc"))
+        let modelURL = try #require(Bundle.main.url(forResource: "BTADetectorODS3", withExtension: "mlmodelc"))
         let vnModel = try VNCoreMLModel(for: try MLModel(contentsOf: modelURL))
 
         return try await withCheckedThrowingContinuation { continuation in

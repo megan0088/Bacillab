@@ -21,11 +21,11 @@ struct YOLO11DetectorTests {
 
     @Test("Model YOLO11 ter-bundle dan kontrak I/O-nya sesuai yang di-decode")
     func modelIsBundledWithExpectedShape() throws {
-        #expect(YOLO11AnalysisService.isDetectorLoaded, "BTADetectorV11.mlmodelc tidak termuat")
+        #expect(YOLO11AnalysisService.isDetectorLoaded, "BTADetectorODS3.mlmodelc tidak termuat")
 
         let url = try #require(
-            Bundle.main.url(forResource: "BTADetectorV11", withExtension: "mlmodelc"),
-            "BTADetectorV11.mlmodelc tidak ada di app bundle"
+            Bundle.main.url(forResource: "BTADetectorODS3", withExtension: "mlmodelc"),
+            "BTADetectorODS3.mlmodelc tidak ada di app bundle"
         )
         let model = try MLModel(contentsOf: url)
 
