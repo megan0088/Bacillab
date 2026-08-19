@@ -16,7 +16,7 @@ struct CountKeypad: View {
     var body: some View {
         VStack(spacing: 14) {
             Text(text.isEmpty ? "—" : text)
-                .font(.system(size: 44, weight: .bold, design: .rounded))
+                .font(.appTitle.weight(.bold))
                 .foregroundStyle(text.isEmpty ? .tertiary : .primary)
                 .frame(height: 54)
                 .contentTransition(.numericText())
@@ -33,7 +33,7 @@ struct CountKeypad: View {
                 key("0") { onDigit("0") }
                 Button(action: onDelete) {
                     Image(systemName: "delete.left")
-                        .font(.title3)
+                        .font(.appHeading)
                         .frame(maxWidth: .infinity, minHeight: 52)
                         .background(Color(.systemGray5), in: RoundedRectangle(cornerRadius: 12))
                 }
@@ -59,7 +59,7 @@ struct CountKeypad: View {
     private func key(_ label: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             Text(label)
-                .font(.system(size: 24, weight: .medium, design: .rounded))
+                .font(.appHeading.weight(.medium))
                 .frame(maxWidth: .infinity, minHeight: 52)
                 .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 12))
         }

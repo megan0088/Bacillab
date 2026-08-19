@@ -103,7 +103,7 @@ struct ResultSheetView: View {
             sectionHeading("Result", tinted: true)
 
             Label("AI analysis ≠ Medical diagnosis", systemImage: "exclamationmark.triangle.fill")
-                .font(.caption)
+                .font(.appCaption)
                 .foregroundStyle(.orange)
 
             gradeBox
@@ -119,7 +119,7 @@ struct ResultSheetView: View {
                     + "\(grade.minimumFields) fields (WHO/IUATLD), so this result is not final.",
                     systemImage: "exclamationmark.circle.fill"
                 )
-                .font(.caption)
+                .font(.appCaption)
                 .foregroundStyle(.orange)
                 .fixedSize(horizontal: false, vertical: true)
             }
@@ -142,12 +142,12 @@ struct ResultSheetView: View {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack(spacing: 8) {
                             Text(gradeLabel)
-                                .font(.system(size: 30, weight: .bold, design: .rounded))
+                                .font(.appTitle.weight(.bold))
                                 .foregroundStyle(gradeColor)
 
                             if !session.isGradeConfirmed {
                                 Text("PROVISIONAL")
-                                    .font(.system(size: 9, weight: .heavy, design: .rounded))
+                                    .font(.appCaption.weight(.heavy))
                                     .padding(.horizontal, 6)
                                     .padding(.vertical, 3)
                                     .background(Color.orange.opacity(0.15), in: Capsule())
@@ -155,14 +155,14 @@ struct ResultSheetView: View {
                             }
                         }
                         Text(gradeCriterion)
-                            .font(.caption)
+                            .font(.appCaption)
                             .foregroundStyle(.secondary)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                     Spacer(minLength: 8)
                     Image(systemName: "chevron.down")
-                        .font(.headline)
+                        .font(.appBody.weight(.semibold))
                         .foregroundStyle(.secondary)
                         .rotationEffect(.degrees(isGradeExpanded ? 180 : 0))
                 }
@@ -198,16 +198,16 @@ struct ResultSheetView: View {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
                             Text(Self.label(for: band))
-                                .font(.system(.subheadline, design: .rounded, weight: .bold))
+                                .font(.appBody.weight(.bold))
                                 .foregroundStyle(band == grade ? gradeColor : .primary)
                             Text(Self.criterion(for: band))
-                                .font(.caption)
+                                .font(.appCaption)
                                 .foregroundStyle(.secondary)
                                 .fixedSize(horizontal: false, vertical: true)
                         }
                         Spacer(minLength: 8)
                         Image(systemName: band == grade ? "checkmark.circle.fill" : "circle")
-                            .font(.subheadline)
+                            .font(.appBody)
                             .foregroundStyle(band == grade ? gradeColor : Color(.systemGray3))
                     }
                     .contentShape(Rectangle())
@@ -240,11 +240,11 @@ struct ResultSheetView: View {
     private func derivationRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top, spacing: 8) {
             Text(label)
-                .font(.caption2.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .frame(width: 108, alignment: .leading)
                 .foregroundStyle(.secondary)
             Text(value)
-                .font(.caption2)
+                .font(.appCaption)
                 .fixedSize(horizontal: false, vertical: true)
             Spacer(minLength: 0)
         }
@@ -286,7 +286,7 @@ struct ResultSheetView: View {
 
     private func sectionHeading(_ title: String, tinted: Bool) -> some View {
         Text(title)
-            .font(.system(.headline, design: .rounded, weight: .bold))
+            .font(.appBody.weight(.bold))
             .foregroundStyle(tinted ? Color.accentColor : .primary)
     }
 
@@ -294,10 +294,10 @@ struct ResultSheetView: View {
     private func infoRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top) {
             Text(label)
-                .font(.subheadline.weight(.semibold))
+                .font(.appBody.weight(.semibold))
             Spacer(minLength: 12)
             Text(value.isEmpty ? "—" : value)
-                .font(.subheadline)
+                .font(.appBody)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.trailing)
         }

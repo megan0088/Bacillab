@@ -38,7 +38,7 @@ struct PatientDataView: View {
                     Label("Open Camera", systemImage: "camera.fill")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 4)
-                        .font(.system(.body, design: .rounded, weight: .semibold))
+                        .font(.appBody.weight(.semibold))
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.accentColor)
@@ -46,7 +46,7 @@ struct PatientDataView: View {
 
                 if !session.patient.isComplete {
                     Text("Patient name and medical record number are required.")
-                        .font(.caption)
+                        .font(.appCaption)
                         .foregroundStyle(.secondary)
                 }
             }
@@ -64,7 +64,7 @@ struct PatientDataView: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(.headline, design: .rounded, weight: .bold))
+            .font(.appBody.weight(.bold))
             .foregroundStyle(Color.accentColor)
     }
 

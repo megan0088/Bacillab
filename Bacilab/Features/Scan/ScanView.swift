@@ -103,11 +103,11 @@ struct ScanView: View {
         VStack(spacing: 6) {
             HStack(spacing: 5) {
                 Text("\(session.fields.count) of \(batchCeiling)")
-                    .font(.system(.headline, design: .rounded, weight: .bold))
+                    .font(.appBody.weight(.bold))
                     .foregroundStyle(.white)
                     .contentTransition(.numericText())
                 Text("Field to go")
-                    .font(.caption)
+                    .font(.appCaption)
                     .foregroundStyle(.white.opacity(0.55))
             }
 
@@ -137,7 +137,7 @@ struct ScanView: View {
                 center: .center, startRadius: 0, endRadius: side * 0.53
             )
             Text("Simulator")
-                .font(.caption.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.6))
             #else
             CameraPreviewView(session: viewModel.session)
@@ -163,7 +163,7 @@ struct ScanView: View {
                     .foregroundStyle(.white.opacity(0.5))
             }
         }
-        .font(.caption.weight(.semibold))
+        .font(.appCaption.weight(.semibold))
         .animation(.easeInOut(duration: 0.2), value: viewModel.isBlurry)
     }
 
@@ -183,14 +183,14 @@ struct ScanView: View {
                         .frame(width: 64, height: 64)
                     if viewModel.isScanning {
                         Image(systemName: "stop.fill")
-                            .font(.system(size: 24))
+                            .font(.appHeading)
                             .foregroundStyle(.white)
                     }
                 }
             }
 
             Text(viewModel.isScanning ? "Tap to stop" : "Start Scan")
-                .font(.caption2.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .foregroundStyle(.white.opacity(0.55))
 
             HStack(spacing: 10) {
@@ -201,7 +201,7 @@ struct ScanView: View {
                         isImporting ? "Importing…" : "Import Photo",
                         systemImage: isImporting ? "hourglass" : "photo.on.rectangle.angled"
                     )
-                    .font(.caption.weight(.medium))
+                    .font(.appCaption.weight(.medium))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 16)
                     .padding(.vertical, 9)
@@ -216,7 +216,7 @@ struct ScanView: View {
                         goToReview = true
                     } label: {
                         Label("Review", systemImage: "arrow.right")
-                            .font(.caption.weight(.semibold))
+                            .font(.appCaption.weight(.semibold))
                             .foregroundStyle(.white)
                             .padding(.horizontal, 16)
                             .padding(.vertical, 9)

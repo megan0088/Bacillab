@@ -68,12 +68,12 @@ struct SampleListView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("Electra Lab")
-                .font(.subheadline)
+                .font(.appBody)
                 .foregroundStyle(.secondary)
             Text("BTA Analyzer")
-                .font(.system(size: 32, weight: .black))
+                .font(.appTitle.weight(.black))
             Text(Date.now.formatted(.dateTime.weekday(.wide).day().month(.wide).year()))
-                .font(.caption)
+                .font(.appCaption)
                 .foregroundStyle(.secondary)
         }
         .padding(.top, 64)
@@ -86,13 +86,13 @@ struct SampleListView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("New Analysis")
-                        .font(.system(.headline, design: .rounded, weight: .bold))
+                        .font(.appBody.weight(.bold))
                     Text("Input patient")
-                        .font(.caption)
+                        .font(.appCaption)
                         .opacity(0.9)
                 }
                 Spacer()
-                Image(systemName: "plus.circle.fill").font(.title)
+                Image(systemName: "plus.circle.fill").font(.appTitle)
             }
             .foregroundStyle(.white)
             .padding(18)
@@ -109,7 +109,7 @@ struct SampleListView: View {
         HStack(spacing: 10) {
             Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
             TextField("Search by ID card number", text: Bindable(viewModel).searchText)
-                .font(.system(.body, design: .rounded))
+                .font(.appBody)
                 .autocorrectionDisabled()
             if !viewModel.searchText.isEmpty {
                 Button {
@@ -131,7 +131,7 @@ struct SampleListView: View {
     private var sessionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("History")
-                .font(.system(.headline, design: .rounded, weight: .bold))
+                .font(.appBody.weight(.bold))
 
             if viewModel.isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding()
@@ -205,30 +205,30 @@ struct SampleListView: View {
                 .frame(width: 44, height: 44)
                 .overlay {
                     Image(systemName: "doc.text.fill")
-                        .font(.system(size: 20))
+                        .font(.appHeading)
                         .foregroundStyle(Color.accentColor)
                 }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(session.patient.examinationDate.formatted(.dateTime.day().month(.wide).year()))
-                    .font(.caption2)
+                    .font(.appCaption)
                     .foregroundStyle(.secondary)
 
                 // The record number leads: it is what is written on the tube and the form, and
                 // is often the only thing the technician is holding when they come looking.
                 Text(session.patient.medicalRecordNumber.isEmpty
                      ? "No MRN" : session.patient.medicalRecordNumber)
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .font(.appBody.weight(.semibold))
 
                 Text(session.patient.name.isEmpty ? "Unnamed" : session.patient.name)
-                    .font(.caption)
+                    .font(.appCaption)
                     .foregroundStyle(.secondary)
             }
 
             Spacer(minLength: 8)
 
             Text(badge.text)
-                .font(.caption2.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .padding(.horizontal, 9)
                 .padding(.vertical, 5)
                 .background(badge.color.opacity(0.15), in: Capsule())
@@ -236,7 +236,7 @@ struct SampleListView: View {
                 .fixedSize()
 
             Image(systemName: "chevron.right")
-                .font(.caption.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .foregroundStyle(.tertiary)
         }
         .padding(.horizontal, 16)

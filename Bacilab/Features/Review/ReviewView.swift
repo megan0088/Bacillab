@@ -95,7 +95,7 @@ struct ReviewView: View {
             ProgressView()
             Text("Analysing \(session.fields.count - viewModel.queue.remaining) "
                  + "of \(session.fields.count) fields…")
-                .font(.caption)
+                .font(.appCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -129,14 +129,14 @@ struct ReviewView: View {
             } label: {
                 HStack(spacing: 10) {
                     Text(countLabel)
-                        .font(.system(size: 22, weight: .bold, design: .rounded))
+                        .font(.appHeading.weight(.bold))
                         .foregroundStyle(.white)
                         .contentTransition(.numericText())
                     Text("BTA")
-                        .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                        .font(.appBody.weight(.semibold))
                         .foregroundStyle(.white.opacity(0.5))
                     Image(systemName: "pencil")
-                        .font(.caption)
+                        .font(.appCaption)
                         .foregroundStyle(.white.opacity(0.5))
                 }
                 .padding(.horizontal, 22)
@@ -172,22 +172,22 @@ struct ReviewView: View {
         if let field = viewModel.selectedField {
             if field.correctedCount != nil {
                 Label("Corrected by analyst", systemImage: "hand.raised.fill")
-                    .font(.caption)
+                    .font(.appCaption)
                     .foregroundStyle(Color.accentColor)
             } else if field.analysis == nil {
                 Text("Waiting for analysis…")
-                    .font(.caption)
+                    .font(.appCaption)
                     .foregroundStyle(.secondary)
             } else if field.effectiveCount == nil {
                 Label("The model could not read this field — enter it manually",
                       systemImage: "exclamationmark.triangle.fill")
-                    .font(.caption)
+                    .font(.appCaption)
                     .foregroundStyle(.orange)
             } else if let confidence = field.analysis?.confidence {
                 let percent = Int((confidence * 100).rounded())
                 VStack(spacing: 4) {
                     Text("\(percent)% AI Confidence Level")
-                        .font(.caption)
+                        .font(.appCaption)
                         .foregroundStyle(.white.opacity(0.55))
 
                     // Prompts a second look; it never changes a count. The threshold is a
@@ -197,7 +197,7 @@ struct ReviewView: View {
                     if percent < Self.lowConfidencePercent {
                         Label("Low AI Confidence, Verify Manually",
                               systemImage: "exclamationmark.circle.fill")
-                            .font(.caption2)
+                            .font(.appCaption)
                             .foregroundStyle(.orange)
                     }
                 }
@@ -224,7 +224,7 @@ struct ReviewView: View {
                     systemImage: viewModel.selectedField?.isExcluded == true
                         ? "arrow.uturn.backward" : "trash"
                 )
-                .font(.caption.weight(.semibold))
+                .font(.appCaption.weight(.semibold))
                 .frame(maxWidth: .infinity, minHeight: 40)
                 .background(Color(.systemGray6), in: RoundedRectangle(cornerRadius: 10))
             }
@@ -234,7 +234,7 @@ struct ReviewView: View {
                 viewModel.selectNext()
             } label: {
                 Text("Sure & Continue")
-                    .font(.subheadline.weight(.semibold))
+                    .font(.appBody.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 44)
                     .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 12))
                     .foregroundStyle(.white)
@@ -262,10 +262,10 @@ struct ReviewView: View {
     private func statCell(label: String, value: String) -> some View {
         VStack(spacing: 4) {
             Text(value)
-                .font(.system(.headline, design: .rounded, weight: .bold))
+                .font(.appBody.weight(.bold))
                 .contentTransition(.numericText())
             Text(label)
-                .font(.caption2)
+                .font(.appCaption)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
@@ -276,7 +276,7 @@ struct ReviewView: View {
     private var gradeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("Set Grade")
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .font(.appBody.weight(.semibold))
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
@@ -285,7 +285,7 @@ struct ReviewView: View {
                             viewModel.chooseGrade(grade)
                         } label: {
                             Text(grade.rawValue)
-                                .font(.caption.weight(.semibold))
+                                .font(.appCaption.weight(.semibold))
                                 .padding(.horizontal, 18)
                                 .padding(.vertical, 9)
                                 .background(session.reportedGrade == grade
@@ -315,7 +315,7 @@ struct ReviewView: View {
                 + "the result will be stamped PROVISIONAL.",
                 systemImage: "exclamationmark.circle.fill"
             )
-            .font(.caption)
+            .font(.appCaption)
             .foregroundStyle(.orange)
             .fixedSize(horizontal: false, vertical: true)
 
@@ -324,7 +324,7 @@ struct ReviewView: View {
                 dismiss()
             } label: {
                 Label("Continue Scanning", systemImage: "camera.fill")
-                    .font(.caption.weight(.semibold))
+                    .font(.appCaption.weight(.semibold))
                     .frame(maxWidth: .infinity, minHeight: 40)
                     .background(Color.accentColor.opacity(0.12), in: RoundedRectangle(cornerRadius: 10))
                     .foregroundStyle(Color.accentColor)
@@ -337,7 +337,7 @@ struct ReviewView: View {
     private var notesSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Laboratory Notes")
-                .font(.system(.subheadline, design: .rounded, weight: .semibold))
+                .font(.appBody.weight(.semibold))
 
             TextEditor(text: Bindable(session).notes)
                 .frame(minHeight: 90)
@@ -362,7 +362,7 @@ struct ReviewView: View {
             HStack {
                 if viewModel.isPublishing { ProgressView().tint(.white) }
                 Text("Publish Result")
-                    .font(.system(.body, design: .rounded, weight: .semibold))
+                    .font(.appBody.weight(.semibold))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 15)

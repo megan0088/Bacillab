@@ -32,10 +32,10 @@ struct CameraPreviewView: UIViewRepresentable {
 
             VStack(spacing: 8) {
                 Image(systemName: "camera.metering.spot")
-                    .font(.system(size: 44))
+                    .font(.appTitle)
                     .foregroundStyle(.white.opacity(0.5))
                 Text("Live on device")
-                    .font(.caption.weight(.semibold))
+                    .font(.appCaption.weight(.semibold))
                     .foregroundStyle(.white.opacity(0.6))
             }
         }

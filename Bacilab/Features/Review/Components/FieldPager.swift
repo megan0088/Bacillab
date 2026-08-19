@@ -39,7 +39,7 @@ struct FieldPager: View {
                 .frame(width: 34, height: 34)
                 .overlay {
                     Text("\(field.index + 1)")
-                        .font(.caption.weight(.semibold))
+                        .font(.appCaption.weight(.semibold))
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
                 .overlay {
