@@ -23,7 +23,7 @@ struct ScanView: View {
 }
 ```
 
-`@Environment` is only safe at the root (`SampleListView`), which is directly under the `.environment(dependencies)` modifier.
+`@Environment` is only safe at the root (`HomeView`), which is directly under the `.environment(dependencies)` modifier.
 
 ### ExamSession — one source of truth, no stored counts
 `ExamSession` is `@Observable`, created once per examination and passed by reference. **No count
@@ -76,7 +76,7 @@ those fields stay `pending` forever and sit outside both the numerator and the d
 ### Demo seeding — images only, never readings
 `DemoSeeder` fills an **empty** history with one 20-field session from tiles bundled in
 `Resources/DemoFields/`, so an exhibition build has something to show. `ElectraLabApp` opts in via
-`SampleListViewModel(seedsDemoData: true)`; the default is off so tests get exactly what they set up.
+`HomeViewModel(seedsDemoData: true)`; the default is off so tests get exactly what they set up.
 
 It seeds **images, not counts.** The source tiles ship with ground-truth annotations, and planting
 those would make a session look instantly analysed while putting numbers on screen that no model
@@ -141,9 +141,10 @@ Bacilab/Bacilab/
 │   └── AppDependencies.swift      # DI container (@Observable)
 ├── Core/
 │   ├── DesignSystem/
-│   │   ├── Colors.swift           # Color.appPrimary etc. (use Color.appX, not .appX)
-│   │   ├── Typography.swift       # Font.appTitle, .appBody etc.
-│   │   └── Skeleton.swift         # SkeletonLine, SkeletonBlock, SkeletonCircle, SkeletonPill + .skeletonShimmer()
+│   │   ├── Atoms/                 # Badge, Skeleton (SkeletonLine/.../.skeletonShimmer()), Swatch
+│   │   ├── Molecules/              # Card, InfoRow, LabeledField, SectionHeader
+│   │   ├── Organisms/              # empty — see ARCHITECTURE.md for the placement rule
+│   │   └── Tokens/                 # Colors.swift (Color.appPrimary etc.), Typography.swift (Font.appTitle etc.), DetectorStyle, GradeCopy, GradeTint
 │   ├── Domain/
 │   │   ├── Entities/
 │   │   │   ├── ExamSession.swift    # @Observable session; derives totalBTA/examinedFieldCount, never stores them
@@ -167,12 +168,14 @@ Bacilab/Bacilab/
 ├── Resources/
 │   └── BTADetector.onnx           # bundled detector, run via ONNX Runtime (79 MB)
 └── Features/
-    ├── SampleList/   # Home screen — history of sessions; FAB starts a new one
+    ├── Home/         # History list + FAB for a new session (+ Components/: HistoryRow, NewAnalysisCard, SearchBar)
     ├── PatientData/  # Patient data form → NavigationLink to Scan
-    ├── Scan/         # Scan session, 20 fields/batch, blind to BTA (+ Components/CameraPreviewView.swift)
+    ├── Scan/         # Scan session, 20 fields/batch, blind to BTA (+ Components/: CameraPreviewView, Viewfinder, ShutterBar)
     ├── Review/       # Per-field count, grade, notes, delete-field, publish — the only screen that decides
-    │                 #   (+ Components/: DetectorStyle, FieldCanvas, FieldPager, CountKeypad)
-    └── ResultSheet/  # Read-only published result; also reached by tapping a sample in history
+    │                 #   (+ Components/: ReviewHeader, GradePicker, FieldCountRow, FieldCanvas, FieldPager, CountKeypad, DetectorLegend)
+    ├── ResultSheet/  # Read-only published result; also reached by tapping a sample in history
+    │                 #   (+ Components/: GradeBox, PatientSection, NotesSection)
+    └── Splash/       # Launch splash shown while the demo session seeds
 ```
 
 ## Detectors, compared on the same field
