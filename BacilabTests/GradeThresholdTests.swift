@@ -77,16 +77,16 @@ struct GradeThresholdTests {
     /// shows PROVISIONAL on every result — which reads as a broken app rather than as the
     /// safeguard working.
     ///
-    /// This is arithmetic, not a detector test: 50 seeded fields land 2+ (the band is 100–1000
-    /// per 100 fields, so 50–500 bacilli over 50 fields) and 2+ needs exactly 50 fields. Both
-    /// ends of the plausible detected density are checked, because dropping the seed back to
-    /// 20 fields silently makes 2+ unconfirmable and the cap returns.
+    /// This is arithmetic, not a detector test: the 20 seeded fields measure 307 bacilli, 1535
+    /// per 100, which is 3+ — the one grade WHO/IUATLD confirm at 20 fields. Both ends of the
+    /// measured per-field range are checked, because a thinner seed would drop the total under
+    /// 1000 per 100, and 2+ needs 50 fields, so the cap would come back.
     @Test("Sesi demo mencapai grade yang benar-benar final")
     func demoSeedReachesAConfirmedGrade() {
-        for perField in [2, 4] {
+        for perField in [11, 27] {          // rentang yang benar-benar terukur: 10..27
             let s = session(fieldCount: DemoSeeder.fieldCount, btaPerField: perField)
-            #expect(s.suggestedGrade == .plus2,
-                    "\(perField) BTA/lapang atas \(DemoSeeder.fieldCount) lapang harus 2+")
+            #expect(s.suggestedGrade == .plus3,
+                    "\(perField) BTA/lapang atas \(DemoSeeder.fieldCount) lapang harus 3+")
             #expect(s.isGradeConfirmed,
                     "Sesi demo tidak boleh tampil PROVISIONAL")
         }

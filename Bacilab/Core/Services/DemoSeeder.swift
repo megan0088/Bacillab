@@ -10,26 +10,27 @@ private let seedLog = Diag("seed")
 /// screen would be ones no model produced. Everything shown next to a grade has to be the
 /// detector's own output, so the seeded fields arrive unanalysed and the real models count them.
 ///
-/// The fields come from **fold 4's held-out validation split** of `tuberculosis-phonecamera` —
-/// the 253 images this model never trained on. The split is reconstructed from `fold4/config.yaml`
-/// (`kfold: 5`, `seed: 42`, `strat_bins: [0,1,4,9]`), and the reconstruction is checked rather than
-/// assumed: measured count MAE over those 253 images is 1.415 against the 1.3241 recorded in
-/// `calibrated_metrics.json`. The direction of that gap is the evidence — training images would
-/// score *below* the recorded figure, being memorised, not slightly above it.
+/// The fields are the 20 densest slides in `tuberculosis-phonecamera`, chosen by the lab from
+/// their own ranking (`top-20-BTA-terbanyak`). Measured through the app's own framing and
+/// circular field of view, the models find **307 bacilli across 20 fields — 1535 per 100**, which
+/// is 3+, and 3+ is the one grade WHO/IUATLD confirm at 20 fields. So the demo reaches a final
+/// grade in a single batch.
 ///
-/// They are **not** the 416 px tiles under `AI TBC/output/TestingData`, which an earlier version of
-/// this file used. Those are cut for the YOLO pipeline, and this ResNet detects **zero** bacilli in
-/// them at every scale tried — so the demo graded every slide Negative while looking like it was
-/// working. If these images are ever swapped again, count what the model actually finds in the new
-/// ones before trusting the grade.
+/// **This is the model's best possible showing, and the gap is wide.** 17 of these 20 images are
+/// in fold 4's *training* split: the model memorised them. They are also the densest slides in the
+/// set, where detection is easiest. Real performance is `calibrated_metrics.json` — precision
+/// 0.79, recall 0.76, count MAE 1.32 — on held-out images, and none of it has been checked against
+/// slides read at Electra Lab. Do not quote the demo as accuracy.
 ///
-/// It still flatters the model: same dataset, same phone-camera rig it was tuned on, and fold 4 is
-/// the best of the five folds. A demo shows the model at its best, not its behaviour on this lab's
-/// slides.
+/// They are **not** the 416 px tiles in `AI TBC/output/TestingData`, which this file used until
+/// 2026-08-19. Those are cut for the YOLO pipeline, and this ResNet finds **zero** bacilli in them
+/// at every scale — verified against the ONNX graph, including on untouched source files. The demo
+/// therefore graded every seeded slide Negative while appearing to work. Any future change of image
+/// source must be checked by counting what the model actually detects: this failure is silent.
 enum DemoSeeder {
 
     /// Matches the bundled `demo-field-NNN.jpg` files.
-    static let fieldCount = 50
+    static let fieldCount = 20
 
     /// Seeds one session if — and only if — there is no history at all.
     ///

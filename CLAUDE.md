@@ -82,21 +82,21 @@ It seeds **images, not counts.** The source tiles ship with ground-truth annotat
 those would make a session look instantly analysed while putting numbers on screen that no model
 produced. The seeded fields arrive unanalysed and the real models count them.
 
-The fields come from **fold 4's held-out validation split** of `tuberculosis-phonecamera` (253
-images, reconstructed from `fold4/config.yaml`: `kfold: 5`, `seed: 42`, `strat_bins: [0,1,4,9]`).
-The reconstruction is verified, not assumed — measured count MAE 1.415 against the 1.3241 in
-`calibrated_metrics.json`, and *slightly above* is the tell: memorised training images would score
-below it.
+The fields are the lab's own 20 densest slides from `tuberculosis-phonecamera`
+(`top-20-BTA-terbanyak`). Measured through the app's framing and circular field of view: **307
+bacilli over 20 fields — 1535 per 100 — which is 3+**, the one grade confirmed at 20 fields. The
+demo reaches a final grade in one batch.
+
+**Never quote the demo as accuracy.** 17 of the 20 are in fold 4's *training* split — memorised —
+and all 20 are the densest slides in the set. Real numbers are precision 0.79 / recall 0.76 /
+count MAE 1.32 on held-out images, unvalidated against Electra Lab's own slides.
 
 They are **not** the 416 px tiles in `AI TBC/output/TestingData`, which the seeder used until
 2026-08-19. Those are cut for the YOLO pipeline, and **this ResNet finds zero bacilli in them at
-every scale** — verified directly against the ONNX graph, including on untouched source files. The
-demo therefore graded every seeded slide Negative while appearing to work perfectly. Any future
-change of image source must be checked by counting what the model actually detects, because this
-failure is completely silent.
-
-The 50 seeded fields detect **258 bacilli — 516 per 100 fields**, mid-band for 2+, which needs 50
-fields. So the demo reaches a genuinely confirmed grade.
+every scale** — verified against the ONNX graph, including on untouched source files. The demo
+therefore graded every seeded slide Negative while appearing to work perfectly. Any future change
+of image source must be checked by counting what the model actually detects, because this failure
+is completely silent.
 
 Even so this flatters the model: same dataset, same phone-camera rig, and fold 4 is the best of the
 five folds. Patient names are prefixed `DEMO —` so nobody mistakes seeded data for a record.
