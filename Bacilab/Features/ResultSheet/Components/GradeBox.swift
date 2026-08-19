@@ -9,6 +9,7 @@ import SwiftUI
 /// is, so re-deciding can never be a way to make a provisional reading look final.
 struct GradeBox: View {
     @Bindable var session: ExamSession
+    let onGradeChange: () -> Void
 
     @State private var isExpanded = false
 
@@ -80,6 +81,7 @@ struct GradeBox: View {
 
                 Button {
                     session.chooseGrade(band)
+                    onGradeChange()
                 } label: {
                     HStack(alignment: .top, spacing: 8) {
                         VStack(alignment: .leading, spacing: 3) {
@@ -150,7 +152,7 @@ struct GradeBox: View {
                                        confidence: 0.98, elapsed: 0.6)],
             primary: .resnet), for: f.id)
     }
-    return GradeBox(session: session)
+    return GradeBox(session: session, onGradeChange: {})
         .padding()
         .background(Color(.systemGroupedBackground))
 }
@@ -164,7 +166,7 @@ struct GradeBox: View {
                                        confidence: 0, elapsed: 0.6)],
             primary: .resnet), for: f.id)
     }
-    return GradeBox(session: session)
+    return GradeBox(session: session, onGradeChange: {})
         .padding()
         .background(Color(.systemGroupedBackground))
 }

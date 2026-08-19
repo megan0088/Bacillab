@@ -52,7 +52,7 @@ struct ResultSheetView: View {
                 .font(.appCaption)
                 .foregroundStyle(.orange)
 
-            GradeBox(session: session)
+            GradeBox(session: session, onGradeChange: persist)
 
             InfoRow("Total Fields Read", "\(session.examinedFieldCount)")
             InfoRow("Total BTA Detected", "\(session.totalBTA)")
