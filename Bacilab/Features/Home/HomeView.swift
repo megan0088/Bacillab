@@ -14,7 +14,7 @@ struct HomeView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 20) {
                     header
-                    banner
+                    NewAnalysisCard { newSession = ExamSession() }
                     sessionsSection
                 }
                 .padding(.horizontal, 20)
@@ -30,7 +30,7 @@ struct HomeView: View {
             // own height, so the bar can never cover a row. As an overlay it did — with the
             // vertical space of a landscape screen, the one seeded session sat underneath it and
             // read as an empty history.
-            .safeAreaInset(edge: .bottom) { searchBar }
+            .safeAreaInset(edge: .bottom) { SearchBar(text: Bindable(viewModel).searchText) }
             .toolbar(.hidden, for: .navigationBar)
             .navigationDestination(for: ExamSession.self) { session in
                 destination(for: session)
@@ -79,55 +79,6 @@ struct HomeView: View {
         .padding(.top, 64)
     }
 
-    private var banner: some View {
-        Button {
-            newSession = ExamSession()
-        } label: {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("New Analysis")
-                        .font(.appHeading .weight(.bold))
-                    Text("Input patient")
-                        .font(.appCaption)
-                        .opacity(0.9)
-                }
-                Spacer()
-                Image(systemName: "plus.circle.fill").font(.appTitle)
-            }
-            .foregroundStyle(.white)
-            .padding(18)
-            .frame(maxWidth: .infinity)
-            .background(
-                LinearGradient(colors: [Color.accentColor, Color.accentColor.opacity(0.7)],
-                               startPoint: .topLeading, endPoint: .bottomTrailing),
-                in: RoundedRectangle(cornerRadius: 20)
-            )
-        }
-    }
-
-    private var searchBar: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "magnifyingglass").foregroundStyle(.secondary)
-            TextField("Search by ID card number", text: Bindable(viewModel).searchText)
-                .font(.appBody)
-                .autocorrectionDisabled()
-            if !viewModel.searchText.isEmpty {
-                Button {
-                    viewModel.searchText = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary)
-                }
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(.regularMaterial, in: Capsule())
-        .overlay(Capsule().stroke(Color(.systemGray4), lineWidth: 0.5))
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 4)
-        .padding(.horizontal, 20)
-        .padding(.bottom, 16)
-    }
-
     private var sessionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("History")
@@ -144,7 +95,7 @@ struct HomeView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(viewModel.filteredSessions) { session in
-                        NavigationLink(value: session) { row(for: session) }
+                        NavigationLink(value: session) { HistoryRow(session: session) }
                             .buttonStyle(.plain)
                             // An abandoned session has to be discardable: 20 fields is tens of
                             // megabytes, and mis-started sessions accumulate. `.onDelete` needs a
@@ -162,48 +113,6 @@ struct HomeView: View {
                 .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 16))
             }
         }
-    }
-
-    private func row(for session: ExamSession) -> some View {
-        let badge = SessionBadge(session: session)
-
-        return HStack(spacing: 14) {
-            RoundedRectangle(cornerRadius: 10)
-                .fill(Color.accentColor.opacity(0.12))
-                .frame(width: 44, height: 44)
-                .overlay {
-                    Image(systemName: "doc.text.fill")
-                        .font(.appHeading)
-                        .foregroundStyle(Color.accentColor)
-                }
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(session.patient.examinationDate.formatted(.dateTime.day().month(.wide).year()))
-                    .font(.appCaption)
-                    .foregroundStyle(.secondary)
-
-                // The record number leads: it is what is written on the tube and the form, and
-                // is often the only thing the technician is holding when they come looking.
-                Text(session.patient.medicalRecordNumber.isEmpty
-                     ? "No MRN" : session.patient.medicalRecordNumber)
-                    .font(.appBody.weight(.semibold))
-
-                Text(session.patient.name.isEmpty ? "Unnamed" : session.patient.name)
-                    .font(.appCaption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Spacer(minLength: 8)
-
-            Badge(text: badge.text, tint: badge.tint)
-                .fixedSize()
-
-            Image(systemName: "chevron.right")
-                .font(.appCaption.weight(.semibold))
-                .foregroundStyle(.tertiary)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
     }
 
 }
