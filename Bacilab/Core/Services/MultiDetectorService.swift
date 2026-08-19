@@ -30,8 +30,6 @@ final class MultiDetectorService: AnalysisServiceProtocol {
     /// decode. `analyze` filters on `detectors[$0] != nil`, so an absent entry is simply not run;
     /// nothing else needs to know.
     init(detectors: [DetectorKind: any AnalysisServiceProtocol] = [
-        .resnet: ResNetAnalysisService(),
-        // .yolo: YOLOAnalysisService(),
         .yolo11: YOLO11AnalysisService(),
     ]) {
         self.detectors = detectors

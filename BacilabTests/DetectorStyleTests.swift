@@ -49,7 +49,7 @@ struct DetectorStyleTests {
     func boxesAreCappedPerModel() {
         let box = DetectedBox(cx: 0.5, cy: 0.5, w: 0.1, h: 0.05, angle: 0)
         let reading = DetectorReading(
-            detector: .resnet, btaCount: 500, confidence: 0.8, elapsed: 0.1,
+            detector: .yolo11, btaCount: 500, confidence: 0.8, elapsed: 0.1,
             boxes: Array(repeating: box, count: 500)
         )
 

@@ -10,7 +10,7 @@ struct DetectionCodableTests {
     @Test("DetectorReading bolak-balik lewat JSON tanpa kehilangan apa pun")
     func readingRoundTrips() throws {
         let original = DetectorReading(
-            detector: .resnet,
+            detector: .yolo11,
             btaCount: 7,
             confidence: 0.82,
             elapsed: 1.25,

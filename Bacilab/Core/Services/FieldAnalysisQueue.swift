@@ -173,8 +173,8 @@ final class FieldAnalysisQueue {
 
     private func analyse(_ job: Job) async -> FieldAnalysis {
         do {
-            let result = try await analysisService.analyze(imageData: job.imageData, using: .all)
-            return FieldAnalysis(readings: result.readings, primary: .resnet)
+            let result = try await analysisService.analyze(imageData: job.imageData, using: .yolo11)
+            return FieldAnalysis(readings: result.readings, primary: .yolo11)
         } catch {
             queueLog.error("Analisis lapang gagal: \(error.localizedDescription)")
             // Kegagalan disimpan sebagai bacaan bertanda `failure`, bukan sebagai hitungan 0.
@@ -187,7 +187,7 @@ final class FieldAnalysisQueue {
                     elapsed: 0,
                     failure: error.localizedDescription
                 )],
-                primary: .resnet
+                primary: .yolo11
             )
         }
     }

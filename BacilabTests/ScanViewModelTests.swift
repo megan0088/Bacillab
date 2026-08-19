@@ -69,7 +69,7 @@ struct ScanViewModelTests {
             AnalysisResult(
                 btaCount: btaCount, confidence: 0.8, grade: .negative, analyzedAt: Date(),
                 detectedBoxes: [],
-                readings: [DetectorReading(detector: .resnet, btaCount: btaCount,
+                readings: [DetectorReading(detector: .yolo11, btaCount: btaCount,
                                            confidence: 0.8, elapsed: 0.01)]
             )
         }

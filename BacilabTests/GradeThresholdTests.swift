@@ -13,9 +13,9 @@ struct GradeThresholdTests {
             let field = session.appendField(imageFileName: "f.jpg")
             session.setAnalysis(
                 FieldAnalysis(
-                    readings: [DetectorReading(detector: .resnet, btaCount: btaPerField,
+                    readings: [DetectorReading(detector: .yolo11, btaCount: btaPerField,
                                                confidence: 0.8, elapsed: 0.4)],
-                    primary: .resnet),
+                    primary: .yolo11),
                 for: field.id)
         }
         return session

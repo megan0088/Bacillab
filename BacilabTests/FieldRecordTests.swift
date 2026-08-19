@@ -8,7 +8,7 @@ import Foundation
 struct FieldRecordTests {
 
     private func reading(_ count: Int, failure: String? = nil) -> DetectorReading {
-        DetectorReading(detector: .resnet, btaCount: count, confidence: 0.8,
+        DetectorReading(detector: .yolo11, btaCount: count, confidence: 0.8,
                         elapsed: 0.5, failure: failure)
     }
 
@@ -32,21 +32,21 @@ struct FieldRecordTests {
 
     @Test("Hitungan model dipakai ketika tidak ada koreksi")
     func modelCountUsedWhenNotCorrected() {
-        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .resnet))
+        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .yolo11))
         #expect(f.effectiveCount == 9)
         #expect(f.isCounted)
     }
 
     @Test("Koreksi analis mengalahkan hitungan model")
     func correctionWins() {
-        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .resnet),
+        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .yolo11),
                       corrected: 4)
         #expect(f.effectiveCount == 4)
     }
 
     @Test("Koreksi nol adalah nol, bukan 'belum dikoreksi'")
     func zeroCorrectionIsRespected() {
-        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .resnet),
+        let f = field(analysis: FieldAnalysis(readings: [reading(9)], primary: .yolo11),
                       corrected: 0)
         #expect(f.effectiveCount == 0, "Nol dari analis harus menang atas 9 dari model")
         #expect(f.isCounted)
@@ -55,7 +55,7 @@ struct FieldRecordTests {
     @Test("Analisis gagal tidak pernah bernilai nol")
     func failedAnalysisHasNoCount() {
         let f = field(analysis: FieldAnalysis(
-            readings: [reading(0, failure: "ORT gagal")], primary: .resnet))
+            readings: [reading(0, failure: "ORT gagal")], primary: .yolo11))
         #expect(f.effectiveCount == nil, "Kegagalan tidak boleh terbaca sebagai 'tidak lihat apa-apa'")
         #expect(f.needsManualCount)
         #expect(!f.isCounted)
@@ -64,7 +64,7 @@ struct FieldRecordTests {
     @Test("Lapang gagal yang dikoreksi manual kembali terhitung")
     func failedFieldRecoveredByCorrection() {
         let f = field(analysis: FieldAnalysis(
-            readings: [reading(0, failure: "ORT gagal")], primary: .resnet), corrected: 3)
+            readings: [reading(0, failure: "ORT gagal")], primary: .yolo11), corrected: 3)
         #expect(f.effectiveCount == 3)
         #expect(f.isCounted)
         #expect(!f.needsManualCount)
@@ -72,7 +72,7 @@ struct FieldRecordTests {
 
     @Test("Lapang yang dibuang tidak terhitung meski punya angka")
     func excludedFieldIsNotCounted() {
-        let f = field(analysis: FieldAnalysis(readings: [reading(12)], primary: .resnet),
+        let f = field(analysis: FieldAnalysis(readings: [reading(12)], primary: .yolo11),
                       excluded: true)
         #expect(!f.isCounted)
         #expect(!f.needsManualCount, "Lapang yang dibuang tidak perlu dihitung manual")
