@@ -46,17 +46,13 @@ struct YOLOInputSizeTests {
                 "3024×4032 menghasilkan 0 deteksi (1024² dapat \(native.btaCount)) — jalur kamera merusak YOLO")
     }
 
-    @Test("ResNet tetap mendeteksi pada ukuran asli kamera")
-    func resnetDetectsAtCameraResolution() async throws {
-        let service = ResNetAnalysisService()
-        let image = try probe()
-
-        let native = try await service.analyze(imageData: try scaled(image, to: CGSize(width: 1024, height: 1024)))
-        let photo = try await service.analyze(imageData: try scaled(image, to: CGSize(width: 3024, height: 4032)))
-
-        #expect(native.btaCount > 0, "1024² menghasilkan 0 deteksi")
-        #expect(photo.btaCount > 0,
-                "3024×4032 menghasilkan 0 deteksi (1024² dapat \(native.btaCount))")
+    /// Moved here when this branch dropped the ResNet test file. With a single model the
+    /// presence check matters more, not less: it is the only detector, so without it the whole
+    /// suite can pass while nothing ever loaded from the bundle.
+    @Test("Detektor termuat dari bundle, bukan fallback")
+    func detectorIsLoaded() throws {
+        #expect(YOLOAnalysisService.isDetectorLoaded,
+                "BTADetector.mlmodelc tidak termuat — test lain bisa hijau tanpa model sama sekali")
     }
 }
 

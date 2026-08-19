@@ -17,9 +17,9 @@ struct SessionStoreTests {
 
     private func analysis(_ count: Int) -> FieldAnalysis {
         FieldAnalysis(
-            readings: [DetectorReading(detector: .resnet, btaCount: count,
+            readings: [DetectorReading(detector: .yolo, btaCount: count,
                                        confidence: 0.8, elapsed: 0.5)],
-            primary: .resnet
+            primary: .yolo
         )
     }
 

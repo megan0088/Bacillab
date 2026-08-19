@@ -13,9 +13,9 @@ struct SessionBadgeTests {
             let field = session.appendField(imageFileName: "f.jpg")
             session.setAnalysis(
                 FieldAnalysis(
-                    readings: [DetectorReading(detector: .resnet, btaCount: bta,
+                    readings: [DetectorReading(detector: .yolo, btaCount: bta,
                                                confidence: 0.8, elapsed: 0.4)],
-                    primary: .resnet),
+                    primary: .yolo),
                 for: field.id)
         }
         session.status = .published

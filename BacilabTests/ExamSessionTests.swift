@@ -8,9 +8,9 @@ struct ExamSessionTests {
 
     private func analysis(_ count: Int, failure: String? = nil) -> FieldAnalysis {
         FieldAnalysis(
-            readings: [DetectorReading(detector: .resnet, btaCount: count,
+            readings: [DetectorReading(detector: .yolo, btaCount: count,
                                        confidence: 0.8, elapsed: 0.5, failure: failure)],
-            primary: .resnet
+            primary: .yolo
         )
     }
 

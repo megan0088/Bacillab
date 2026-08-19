@@ -40,7 +40,7 @@ struct FieldAnalysisQueueTests {
                 grade: .scanty,
                 analyzedAt: Date(),
                 detectedBoxes: [],
-                readings: [DetectorReading(detector: .resnet, btaCount: countPerField,
+                readings: [DetectorReading(detector: .yolo, btaCount: countPerField,
                                            confidence: 0.8, elapsed: 0.01)]
             )
         }
