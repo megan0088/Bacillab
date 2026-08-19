@@ -309,15 +309,20 @@ struct ReviewView: View {
     /// Below the WHO/IUATLD threshold this grade may not stand as a report.
     private var provisionalNotice: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Label(
-                "\(session.reportedGrade.rawValue) needs \(session.reportedGrade.minimumFields) "
-                + "fields (WHO/IUATLD). \(session.fieldsRemainingForGrade) more to go — "
-                + "the result will be stamped PROVISIONAL.",
-                systemImage: "exclamationmark.circle.fill"
-            )
-            .font(.appCaption)
-            .foregroundStyle(.orange)
-            .fixedSize(horizontal: false, vertical: true)
+            // Only the warning is suppressed for the exhibition. `Continue Scanning` below stays
+            // either way — hiding the shortfall *and* the way to fix it would leave the analyst
+            // no route to a grade that is actually confirmed.
+            if !DemoMode.hidesProvisionalMarks {
+                Label(
+                    "\(session.reportedGrade.rawValue) needs \(session.reportedGrade.minimumFields) "
+                    + "fields (WHO/IUATLD). \(session.fieldsRemainingForGrade) more to go — "
+                    + "the result will be stamped PROVISIONAL.",
+                    systemImage: "exclamationmark.circle.fill"
+                )
+                .font(.appCaption)
+                .foregroundStyle(.orange)
+                .fixedSize(horizontal: false, vertical: true)
+            }
 
             Button {
                 session.status = .scanning

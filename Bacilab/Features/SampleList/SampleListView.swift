@@ -190,7 +190,7 @@ struct SampleListView: View {
         // sheet stamps PROVISIONAL on the same session. The sharpest case is a session whose
         // fields all failed analysis: zero fields read, `suggestedGrade` falls back to Negative,
         // and without this it would show a plain green "Negative" having read nothing at all.
-        guard session.isGradeConfirmed else {
+        guard session.isGradeConfirmed || DemoMode.hidesProvisionalMarks else {
             return ("\(name) · Provisional", .orange)
         }
         return (name, color)

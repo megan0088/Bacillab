@@ -145,7 +145,7 @@ struct ResultSheetView: View {
                                 .font(.appTitle.weight(.bold))
                                 .foregroundStyle(gradeColor)
 
-                            if !session.isGradeConfirmed {
+                            if !session.isGradeConfirmed, !DemoMode.hidesProvisionalMarks {
                                 Text("PROVISIONAL")
                                     .font(.appCaption.weight(.heavy))
                                     .padding(.horizontal, 6)
