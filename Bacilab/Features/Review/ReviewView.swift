@@ -37,6 +37,7 @@ struct ReviewView: View {
                 )
 
                 fieldCanvas
+                detectorLegend
                 fieldCountRow
                 fieldActions
 
@@ -120,6 +121,15 @@ struct ReviewView: View {
             }
         }
         .frame(height: 320)
+    }
+
+    /// Shown only once a field has been read: before that there is nothing to name.
+    @ViewBuilder
+    private var detectorLegend: some View {
+        if let analysis = viewModel.selectedField?.analysis, !analysis.readings.isEmpty {
+            DetectorLegend(readings: analysis.readings, primary: analysis.primary)
+                .padding(.horizontal, 20)
+        }
     }
 
     private var fieldCountRow: some View {

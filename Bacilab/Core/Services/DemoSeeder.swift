@@ -47,48 +47,81 @@ enum DemoSeeder {
         }
     }
 
+    /// Five sessions, so the history looks like a working day rather than a single record.
+    ///
+    /// **Each one gets all 20 fields, and that is forced by the grading rules, not a shortcut.**
+    /// 3+ is the only grade WHO/IUATLD confirm at 20 fields — 2+ needs 50, everything else needs
+    /// 100 — so a session seeded with a smaller subset could never reach a final grade, and with
+    /// the provisional marks hidden for the exhibition it would show a shortfall grade looking
+    /// exactly like a conclusion. With 20 source images and five sessions, the images therefore
+    /// repeat; what differs is the patient, the date, and the order the fields were read in.
     private static func seed(into store: any SessionStoreProtocol) async throws {
-        let session = ExamSession(patient: demoPatient, status: .reviewing)
+        for (offset, patient) in demoPatients.enumerated() {
+            let session = ExamSession(patient: patient, status: .reviewing)
 
-        for index in 0..<fieldCount {
-            let name = String(format: "demo-field-%03d", index)
-            guard let url = Bundle.main.url(forResource: name, withExtension: "jpg"),
-                  let raw = try? Data(contentsOf: url),
-                  let image = UIImage(data: raw),
-                  // Framed exactly as a captured field would be, so the demo exercises the same
-                  // pixels the detectors see in real use.
-                  let jpeg = FieldFraming.analysisJPEG(of: image)
-            else {
-                seedLog.error("Demo field \(name) missing from the bundle")
-                continue
+            // A different reading order per session: a slide is read field by field in whatever
+            // order the stage moves, and identical ordering across five patients would be the
+            // one detail that gives the seeding away at a glance.
+            var order = Array(0..<fieldCount)
+            order.shuffle()
+
+            for sourceIndex in order {
+                let name = String(format: "demo-field-%03d", sourceIndex)
+                guard let url = Bundle.main.url(forResource: name, withExtension: "jpg"),
+                      let raw = try? Data(contentsOf: url),
+                      let image = UIImage(data: raw),
+                      // Framed exactly as a captured field would be, so the demo exercises the
+                      // same pixels the detectors see in real use.
+                      let jpeg = FieldFraming.analysisJPEG(of: image)
+                else {
+                    seedLog.error("Demo field \(name) missing from the bundle")
+                    continue
+                }
+
+                let fileName = String(format: "field-%03d.jpg", session.fields.count)
+                try store.writeFieldImage(jpeg, fileName: fileName, for: session)
+                // Tagged `.gallery`: these fields did not come through an eyepiece, and the
+                // result sheet counts imported fields separately for exactly that reason.
+                session.appendField(imageFileName: fileName, source: .gallery)
             }
 
-            let fileName = String(format: "field-%03d.jpg", session.fields.count)
-            try store.writeFieldImage(jpeg, fileName: fileName, for: session)
-            // Tagged `.gallery`: these fields did not come through an eyepiece, and the result
-            // sheet counts imported fields separately for exactly that reason.
-            session.appendField(imageFileName: fileName, source: .gallery)
-        }
+            guard !session.fields.isEmpty else {
+                seedLog.error("No demo fields were bundled; nothing seeded")
+                return
+            }
 
-        guard !session.fields.isEmpty else {
-            seedLog.error("No demo fields were bundled; nothing seeded")
-            return
+            try await store.save(session.snapshot())
+            seedLog.note("Seeded demo session \(offset + 1) of \(demoPatients.count) "
+                         + "with \(session.fields.count) fields, unanalysed")
         }
-
-        try await store.save(session.snapshot())
-        seedLog.note("Seeded a demo session with \(session.fields.count) fields, unanalysed")
     }
 
     /// Obviously fictional, so nobody mistakes the demo for a patient record.
-    private static var demoPatient: PatientInfo {
-        var patient = PatientInfo()
-        patient.name = "DEMO — Charles Game"
-        patient.medicalRecordNumber = "RM 240724-001"
-        patient.nationalID = "3204010101900001"
-        patient.address = "Demo data — not a real record"
-        patient.phone = "—"
-        patient.dateOfBirth = Calendar.current.date(from: DateComponents(year: 1990, month: 1, day: 1))
-            ?? Date()
-        return patient
+    ///
+    /// The `DEMO —` prefix is the guard: these sit in the same history as real examinations, and
+    /// a plausible-looking name beside a 3+ result is a record someone could act on.
+    private static var demoPatients: [PatientInfo] {
+        let people: [(String, String, String)] = [
+            ("DEMO — Charles Game",   "RM 240724-001", "3204010101900001"),
+            ("DEMO — Ratna Kusuma",   "RM 240724-002", "3204010101900002"),
+            ("DEMO — Bagus Prayoga",  "RM 240724-003", "3204010101900003"),
+            ("DEMO — Siti Halimah",   "RM 240724-004", "3204010101900004"),
+            ("DEMO — Yusuf Ardiansyah", "RM 240724-005", "3204010101900005"),
+        ]
+
+        return people.enumerated().map { index, person in
+            var patient = PatientInfo()
+            patient.name = person.0
+            patient.medicalRecordNumber = person.1
+            patient.nationalID = person.2
+            patient.address = "Demo data — not a real record"
+            patient.phone = "—"
+            patient.dateOfBirth = Calendar.current.date(
+                from: DateComponents(year: 1985 + index * 2, month: 1 + index, day: 1 + index)) ?? Date()
+            // Staggered so the history sorts into a sequence instead of five identical rows.
+            patient.examinationDate = Calendar.current.date(
+                byAdding: .day, value: -index, to: Date()) ?? Date()
+            return patient
+        }
     }
 }

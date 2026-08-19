@@ -126,6 +126,13 @@ final class FieldAnalysisQueue {
             enqueuedIDs.remove(job.fieldID)
             persist(job.session)
             remaining = jobs.count
+
+            // An out-of-memory kill leaves no trace inside the app, so the footprint is logged
+            // per field: if it climbs field over field, the queue is accumulating and that is
+            // the bug; if it is flat, the abrupt exits are something else entirely and looking
+            // at allocations any further is wasted effort.
+            queueLog.note(String(format: "lapang selesai, sisa %d, memori %.0f MB",
+                                 remaining, Diag.footprintMB))
         }
         guard generation == myGeneration else { return }
         remaining = jobs.isEmpty ? 0 : jobs.count
