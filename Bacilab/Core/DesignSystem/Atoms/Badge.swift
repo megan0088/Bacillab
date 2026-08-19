@@ -10,10 +10,10 @@ struct Badge: View {
 
     var body: some View {
         Text(text)
-            .font(.appCaption.weight(.bold))
-            .padding(.horizontal, 10)
+            .font(.appCaption.weight(.semibold))
+            .padding(.horizontal, 9)
             .padding(.vertical, 5)
-            .background(tint.opacity(0.18), in: Capsule())
+            .background(tint.opacity(0.15), in: Capsule())
             .foregroundStyle(tint)
     }
 }

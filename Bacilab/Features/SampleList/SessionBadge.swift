@@ -14,7 +14,7 @@ struct SessionBadge {
     let text: String
     let tint: Color
 
-    init(session: ExamSession) {
+    init(session: ExamSession, hidesProvisionalMarks: Bool = DemoMode.hidesProvisionalMarks) {
         guard session.status == .published else {
             text = "In progress"
             tint = .orange
@@ -23,7 +23,7 @@ struct SessionBadge {
 
         let name = session.reportedGrade.displayName
 
-        guard session.isGradeConfirmed || DemoMode.hidesProvisionalMarks else {
+        guard session.isGradeConfirmed || hidesProvisionalMarks else {
             text = "\(name) · Provisional"
             tint = .orange
             return

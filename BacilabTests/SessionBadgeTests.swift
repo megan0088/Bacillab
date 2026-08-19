@@ -40,4 +40,18 @@ struct SessionBadgeTests {
         let badge = SessionBadge(session: published(fields: 20, bta: 15))
         #expect(badge.tint == BTAGrade.plus3.tint)
     }
+
+    @Test("Grade di bawah ambang lapang tampil Provisional saat switch demo mati")
+    func belowFieldGateReadsAsProvisionalWhenDemoSwitchIsOff() {
+        // 5 lapang, 0 basil -> suggestedGrade Negatif, tapi Negatif butuh 100 lapang penuh.
+        let badge = SessionBadge(session: published(fields: 5, bta: 0), hidesProvisionalMarks: false)
+        #expect(badge.text == "Negative · Provisional")
+        #expect(badge.tint == .orange)
+    }
+
+    @Test("Switch demo menyembunyikan tanda Provisional pada sesi yang sama")
+    func demoSwitchHidesProvisionalMark() {
+        let badge = SessionBadge(session: published(fields: 5, bta: 0), hidesProvisionalMarks: true)
+        #expect(badge.text == "Negative")
+    }
 }
