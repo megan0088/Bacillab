@@ -86,7 +86,7 @@ struct SampleListView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("New Analysis")
-                        .font(.appBody.weight(.bold))
+                        .font(.appHeading .weight(.bold))
                     Text("Input patient")
                         .font(.appCaption)
                         .opacity(0.9)
@@ -131,7 +131,7 @@ struct SampleListView: View {
     private var sessionsSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("History")
-                .font(.appBody.weight(.bold))
+                .font(.appHeading.weight(.medium))
 
             if viewModel.isLoading {
                 ProgressView().frame(maxWidth: .infinity).padding()
@@ -176,14 +176,15 @@ struct SampleListView: View {
         }
 
         let name: String
-        let color: Color
         switch session.reportedGrade {
-        case .negative: (name, color) = ("Negative", .green)
-        case .scanty:   (name, color) = ("Scanty", .orange)
-        case .plus1:    (name, color) = ("Positive 1+", .red)
-        case .plus2:    (name, color) = ("Positive 2+", .red)
-        case .plus3:    (name, color) = ("Positive 3+", .red)
+        case .negative: name = "Negative"
+        case .scanty:   name = "Scanty"
+        case .plus1:    name = "Positive 1+"
+        case .plus2:    name = "Positive 2+"
+        case .plus3:    name = "Positive 3+"
         }
+        // Colour comes from `BTAGrade.tint`, never from a switch here — see GradeTint.swift.
+        let color = session.reportedGrade.tint
 
         // Below the WHO/IUATLD field minimum this grade is not a conclusion. The list is where
         // someone scans to see what a slide said, so it must not read as final while the result

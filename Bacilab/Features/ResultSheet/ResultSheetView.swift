@@ -17,13 +17,7 @@ struct ResultSheetView: View {
 
     private var grade: BTAGrade { session.reportedGrade }
 
-    private var gradeColor: Color {
-        switch grade {
-        case .negative:              return .green
-        case .scanty:                return .orange
-        case .plus1, .plus2, .plus3: return .red
-        }
-    }
+    private var gradeColor: Color { grade.tint }
 
     private var gradeLabel: String { Self.label(for: grade) }
 
