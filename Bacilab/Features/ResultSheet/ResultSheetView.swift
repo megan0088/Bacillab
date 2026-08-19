@@ -113,7 +113,7 @@ struct ResultSheetView: View {
             infoRow("AI Confidence",
                     meanConfidence.map { "\(Int(($0 * 100).rounded()))%" } ?? "—")
 
-            if !session.isGradeConfirmed {
+            if !session.isGradeConfirmed, !DemoMode.hidesProvisionalMarks {
                 Label(
                     "Only \(session.examinedFieldCount) fields read. \(grade.rawValue) requires "
                     + "\(grade.minimumFields) fields (WHO/IUATLD), so this result is not final.",
@@ -220,8 +220,12 @@ struct ResultSheetView: View {
             derivationRow("Counted",
                           "\(session.totalBTA) BTA across \(session.examinedFieldCount) fields read")
             derivationRow("Extrapolated", String(format: "%.0f BTA per 100 fields", per100))
+            // The requirement itself always shows — it is what the scale is built on. Only the
+            // met/short verdict is a provisional mark, so only that part answers to the flag.
             derivationRow("Fields required",
-                          session.isGradeConfirmed
+                          DemoMode.hidesProvisionalMarks
+                          ? "\(grade.minimumFields) (WHO/IUATLD)"
+                          : session.isGradeConfirmed
                           ? "\(grade.minimumFields) (WHO/IUATLD) — met"
                           : "\(grade.minimumFields) (WHO/IUATLD) — \(session.fieldsRemainingForGrade) short")
             // Two models read every field but only one produces this number, and a reader has no
