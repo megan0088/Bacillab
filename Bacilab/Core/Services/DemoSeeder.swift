@@ -16,7 +16,7 @@ private let seedLog = Diag("seed")
 enum DemoSeeder {
 
     /// Matches the bundled `demo-field-NNN.jpg` files.
-    static let fieldCount = 20
+    static let fieldCount = 50
 
     /// Seeds one session if — and only if — there is no history at all.
     ///
