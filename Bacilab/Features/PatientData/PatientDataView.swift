@@ -17,18 +17,20 @@ struct PatientDataView: View {
                 // under "Test Information", which is not where anyone would look for it.
                 SectionHeader("Patient Information", tinted: true)
 
-                formField("Medical Record Number (MRN)", text: $session.patient.medicalRecordNumber)
-                formField("NIK", text: $session.patient.nationalID)
-                formField("Patient Name", text: $session.patient.name)
-                dateField("Date of Birth", date: $session.patient.dateOfBirth)
-                formField("Address", text: $session.patient.address)
-                formField("Phone Number", text: $session.patient.phone)
+                LabeledField(placeholder: "Medical Record Number (MRN)",
+                             text: $session.patient.medicalRecordNumber)
+                LabeledField(placeholder: "NIK", text: $session.patient.nationalID)
+                LabeledField(placeholder: "Patient Name", text: $session.patient.name)
+                LabeledDateField(label: "Date of Birth", date: $session.patient.dateOfBirth)
+                LabeledField(placeholder: "Address", text: $session.patient.address)
+                LabeledField(placeholder: "Phone Number", text: $session.patient.phone)
 
                 SectionHeader("Test Information", tinted: true)
 
-                dateField("Examination Date", date: $session.patient.examinationDate)
-                dateField("Sample Collection Time", date: $session.patient.sampleCollectedAt,
-                          components: [.date, .hourAndMinute])
+                LabeledDateField(label: "Examination Date", date: $session.patient.examinationDate)
+                LabeledDateField(label: "Sample Collection Time",
+                                 date: $session.patient.sampleCollectedAt,
+                                 components: [.date, .hourAndMinute])
 
                 Spacer(minLength: 24)
 
@@ -60,38 +62,6 @@ struct PatientDataView: View {
                 Button("Cancel") { dismiss() }
             }
         }
-    }
-
-    private func formField(_ placeholder: String, text: Binding<String>) -> some View {
-        TextField(placeholder, text: text)
-            .padding(14)
-            .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
-            .overlay(
-                RoundedRectangle(cornerRadius: 10)
-                    .stroke(Color(.systemGray4), lineWidth: 1)
-            )
-    }
-
-    /// A date picker has no placeholder to put a name in, so its name stays a leading label —
-    /// which is also how the hi-fi draws these rows.
-    private func dateField(
-        _ label: String,
-        date: Binding<Date>,
-        components: DatePickerComponents = .date
-    ) -> some View {
-        HStack {
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            DatePicker("", selection: date, displayedComponents: components)
-                .labelsHidden()
-        }
-        .padding(14)
-        .background(Color(.systemBackground), in: RoundedRectangle(cornerRadius: 10))
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(.systemGray4), lineWidth: 1)
-        )
     }
 }
 
