@@ -2,6 +2,14 @@ import SwiftUI
 
 /// Deretan nomor lapang, satu dot per lapang.
 ///
+/// Sized so roughly five fit across a phone at once, with the sixth just peeking — the peek is
+/// what tells the analyst the row scrolls at all. A dot is 56pt inside a 60pt box, and the
+/// remaining 4pt is what the orange marker overhangs into.
+///
+/// The number steps up to `.appHeading` rather than staying at `.appCaption`, because at 56pt a
+/// 13pt digit reads as an afterthought. 22pt keeps roughly the proportion the smaller dot had;
+/// there is no size in between, and inventing one would break the four-step scale.
+///
 /// Dot bertanda oranye adalah lapang yang belum punya angka — gagal dianalisis atau masih
 /// diantre. Keduanya keluar dari pembilang dan penyebut, jadi analis harus bisa menemukannya
 /// tanpa membuka satu per satu.
@@ -13,7 +21,7 @@ struct FieldPager: View {
     var body: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
+                HStack(spacing: 10) {
                     ForEach(fields) { field in
                         dot(for: field)
                             .id(field.id)
@@ -36,10 +44,10 @@ struct FieldPager: View {
         return ZStack(alignment: .topTrailing) {
             Circle()
                 .fill(isSelected ? Color.accentColor : Color(.systemGray5))
-                .frame(width: 34, height: 34)
+                .frame(width: 56, height: 56)
                 .overlay {
                     Text("\(field.index + 1)")
-                        .font(.appCaption.weight(.semibold))
+                        .font(.appHeading.weight(.semibold))
                         .foregroundStyle(isSelected ? .white : .primary)
                 }
                 .overlay {
@@ -49,7 +57,7 @@ struct FieldPager: View {
                         Circle().stroke(Color(.systemGray), lineWidth: 1)
                         Rectangle()
                             .fill(Color(.systemGray))
-                            .frame(width: 24, height: 1.5)
+                            .frame(width: 40, height: 2.5)
                             .rotationEffect(.degrees(-45))
                     }
                 }
@@ -58,11 +66,11 @@ struct FieldPager: View {
             if needsAttention {
                 Circle()
                     .fill(Color.orange)
-                    .frame(width: 10, height: 10)
-                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
+                    .frame(width: 16, height: 16)
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 2))
             }
         }
-        .frame(width: 38, height: 38)
+        .frame(width: 60, height: 60)
     }
 }
 
